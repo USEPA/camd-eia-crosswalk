@@ -1,0 +1,1034 @@
+---
+title: "CAMD Unit to Generator Mapping"
+output:
+  html_document:
+    df_print: paged
+    code_folding: hide
+    theme: readable
+    highlight: espresso
+---
+
+# Background
+
+This notebook pulls the generator information from the CAMD FACT API and performs a mapping to the EIA-860 generator data in order to develop a crosswalk between CAMD and EIA units. CAMD and EIA datasets both include information on emissions, electricity generation, operations, and facility attributes of power plants across the United States. This crosswalk relates key identifiers assigned to power plant components to make it easier to connect and use both datasets.
+
+A power plant has a unique facility ID known as an ORIS code or plant code. Steam power plants are made up of boilers (where fuel is combusted to generate steam that moves a turbine) and generators (where kinetic energy from the turbine is convereted to electrical energy) to generate electricity. Boilers and generators are interchangeably referred to as units. Because CAMD data is collected for environmental compliance, CAMD considers units to be boilers. On the other hand, EIA data is collected to track electricity generation, so EIA considers units to be generators. The boiler and generator IDs may not be the same, even if they are a part of the same system. In addition, reporting discrepancies may mean that the IDs may not match across the two agencies' databases. This crosswalk connects these components from both datasets.
+
+
+# Methodology
+
+First, CAMD makes a simple match between units on ORIS code and generator ID. Then, CAMD develops rules to match the remaining units to minimize the amount of manual matching that needs to be done.
+
+## Step 0
+
+Though ORIS/plant code should be consistent across both datasets, in some instances they are different. These discrepancies are changed prior to any matching in order to increase the number of matches. In the code, the EIA plant code is changed to match CAMD ORIS code using a reference table. A flag is added to track which generators have a plant code changed.
+
+## Step 1
+
+Generators are matched in the two datasets on ORIS/plant code and generator ID. This is a simple, exact match using dplyr::left_join(). The overwhelming majority of generators are matched in this step.
+
+## Step 2
+
+The remaining generators are matched using fuzzy matching, which uses custom rules to match discrepancies between similar generator IDs. These discrepancies may be due to reporting inconsistencies or typos. The algorithm sets that generators must match exactly on ORIS/plant code, but different rules are set to allow generator IDs within the same plant to match. These rules include removing white space or special characters or matching on leading or trailing numbers.
+
+
+## Import required packages
+```{r, echo = TRUE}
+rm(list = ls())
+
+library(tidyverse)
+# tidyr – Help create tidy data
+# stringr – Make working with strings easier (string_glue())
+# readr – Read csv, txt, etc
+# tibble – Wrapper for data.frames that makes things easier (e.g. never converts strings to factors)
+
+library(lubridate) # Make working with dates easier
+
+library(httr) # Perform HTTP requests (in this case used to get data from FACT API)
+
+library(tidyjson) # Work with json objects in a tidy way. Useful for highly nested objects and ‘ragged’ arrays and/or objects (varying lengths by document)
+
+library(readxl) # Read data from xlsx files via read_excel()
+
+library(openxlsx) # Create and write to formatted xlsx documents
+
+library(fuzzyjoin) # Join tables together based on whether they are similar by some comparison
+
+library(stringdist) # Calculate “string distances” based on edits
+```
+
+
+
+## Import CAMD Data
+This section imports the unit and generator data from the CAMD FACT API. **A FACT API key is required** and can be obtained easily by signing up at the [FACT API website](https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api#signup).
+```{r, echo = TRUE}
+
+# API key for FACT API
+api_key <- "YOUR_API_KEY"
+
+if (api_key == "YOUR_API_KEY") {
+  stop("You must provide a FACT API key")
+}
+
+response <-
+  GET(str_glue(
+    "https://api.epa.gov/FACT/1.0/facilities?api_key={api_key}"
+  ))
+
+# If something is wrong with the request, fail gracefully
+stop_for_status(response, content(response)$error$message)
+
+facs_json <- content(response, as = "text") %>%
+  enter_object("data") # Top level json object that is an array of all the plants/oris
+
+facs_tbl <- facs_json %>%
+  gather_array() %>%
+  spread_all()
+
+units <- facs_tbl %>%
+  enter_object("units") %>%
+  gather_array() %>%
+  spread_all()
+
+# Since we are focusing on EIA data from 2018, we must filter CAMD data to
+# filter out units that started operating after 2018 and those that retired before 2018
+units <- units %>%
+  filter((status == "OPR" &
+    ymd(as.Date(statusDate)) < "2019-01-01") |
+    (status %in% c("RET", "LTCS") &
+      ymd(as.Date(statusDate)) > "2017-12-31"))
+
+fuels <- units %>%
+  enter_object("fuels") %>%
+  gather_array() %>%
+  spread_all() %>%
+  # We only want to see primary fuels
+  subset(indicatorDescription == "Primary") %>%
+  select(
+    orisCode,
+    name,
+    region.name,
+    state.name,
+    unitId,
+    indicatorDescription,
+    fuelDesc
+  )
+
+generators <- units %>%
+  enter_object("generators") %>%
+  gather_array() %>%
+  spread_all() %>%
+  select(
+    orisCode,
+    name,
+    region.name,
+    state.name,
+    geographicLocation.latitude,
+    geographicLocation.longitude,
+    unitId,
+    status,
+    statusDate,
+    generatorId,
+    nameplateCapacity
+  )
+
+# Joining into a complete units table
+unit_universe <-
+  full_join(fuels,
+    generators,
+    by = c("orisCode", "name", "state.name", "unitId")
+  ) %>%
+  select(
+    ORIS_CODE = "orisCode",
+    FACILITY_NAME = "name",
+    STATE = state.name,
+    CAMD_LATITUDE = geographicLocation.latitude,
+    CAMD_LONGITUDE = geographicLocation.longitude,
+    UNITID = "unitId",
+    OP_STATUS = "status",
+    OP_STATUS_DATE = "statusDate",
+    GENID = "generatorId",
+    NAMEPLATE_CAPACITY = "nameplateCapacity",
+    PRIMARY_FUEL_TYPE_DESC = "fuelDesc"
+  )
+
+unit_universe <- unit_universe %>%
+  arrange(ORIS_CODE, UNITID)
+
+
+# Change state names to state abbreviations using a reference table
+state_reference <- read_csv("data/state_reference.csv")
+
+unit_universe <- unit_universe %>%
+  left_join(state_reference, by = c("STATE" = "State_Name")) %>%
+  select(-STATE) %>%
+  mutate(STATE = State_Abbreviation) %>%
+  select(
+    ORIS_CODE,
+    STATE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    FACILITY_NAME,
+    UNITID,
+    GENID,
+    NAMEPLATE_CAPACITY,
+    PRIMARY_FUEL_TYPE_DESC,
+    OP_STATUS,
+    OP_STATUS_DATE,
+    -State_Abbreviation
+  )
+
+unit_universe$CAMD <- "X"
+
+unit_universe
+```
+
+## Import EIA Data
+This section downloads and imports data from EIA-860 for the year 2018. To manually download the data from EIA, visit this link for the [2018 EIA-860 data](https://www.eia.gov/electricity/data/eia860/). Select and download the 2018 ZIP file on the right-hand-side of the page. The file used in this analysis is "3_1_Generator_Y2018.xlsx", with a supporting document "2___Plant_Y2018.xlsx" to get lat/long.
+```{r, echo = TRUE}
+# Import Generator Data file from EIA-860 (Operable & Retired and Canceled)
+eia_860 <- "eia8602018"
+
+download.file(
+  str_glue(
+    "https://www.eia.gov/electricity/data/eia860/archive/xls/{eia_860}.zip"
+  ),
+  str_glue("data/{eia_860}.zip")
+)
+
+unzip(zipfile = str_glue("data/{eia_860}.zip"), exdir = "data")
+
+eia_plant <-
+  read_excel(
+    "data/2___Plant_Y2018.xlsx",
+    sheet = "Plant",
+    range = cell_cols("C:K"),
+    skip = 1,
+    trim_ws = TRUE
+  ) %>%
+  select(
+    EIA_PLANT_CODE = "Plant Code",
+    EIA_LATITUDE = "Latitude",
+    EIA_LONGITUDE = "Longitude"
+  )
+
+eia_gen_opr <-
+  read_excel(
+    "data/3_1_Generator_Y2018.xlsx",
+    sheet = "Operable",
+    range = cell_cols("C:AH"),
+    skip = 1,
+    trim_ws = TRUE
+  ) %>%
+  select(-"Planned Retirement Month", -"Planned Retirement Year")
+eia_gen_ret <-
+  read_excel(
+    "data/3_1_Generator_Y2018.xlsx",
+    sheet = "Retired and Canceled",
+    range = cell_cols("C:AH"),
+    skip = 1,
+    trim_ws = TRUE
+  ) %>%
+  select(-"Retirement Month", -"Retirement Year")
+eia_gen <- rbind(eia_gen_opr, eia_gen_ret)
+rm(eia_gen_opr)
+rm(eia_gen_ret)
+
+eia_gen %>%
+  select(
+    EIA_PLANT_CODE = "Plant Code",
+    EIA_STATE = "State",
+    EIA_PLANT_NAME = "Plant Name",
+    GENERATOR_ID = "Generator ID",
+    UNIT_TYPE = "Prime Mover",
+    EIA_NAMEPLATE_CAPACITY = "Nameplate Capacity (MW)",
+    EIA_FUEL_TYPE = "Energy Source 1"
+  ) %>%
+  mutate(EIA_GENERATOR_ID = GENERATOR_ID) -> eia_gen
+
+# Add lat and long from 2__Plant_Y2018.xlsx
+eia_gen <- eia_gen %>%
+  inner_join(eia_plant, by = c("EIA_PLANT_CODE"))
+
+eia_gen$EIA <- "X"
+
+eia_gen
+```
+
+## Step 0: 
+
+Correct ORIS/plant code discrepancies between CAMD and EIA data according to eGRID TSD
+
+In the production of eGRID, CAMD checks whether there are any discrepancies between the ORIS code in CAMD's database and the plant code in EIA's database. A small number of plants do have these mismatches, and they are corrected in this section. This section changes the plant code in EIA's data to match CAMD's ORIS code data, according to Table C-5 of Appendix C in the [eGRID2018 TSD](https://www.epa.gov/egrid/egrid-technical-support-document). A direct download for this table in xlsx format can be found here: [epa-eia_plant_id_crosswalk.xlsx](https://www.epa.gov/sites/production/files/2020-09/epa-eia_plant_id_crosswalk.xlsx).
+```{r,echo = TRUE}
+# Get corrections from excel sheet
+download.file(
+  "https://www.epa.gov/sites/production/files/2020-09/epa-eia_plant_id_crosswalk.xlsx",
+  "data/epa-eia_plant_id_crosswalk.xlsx",
+  mode = "wb"
+)
+
+replacements <-
+  read_excel("data/epa-eia_plant_id_crosswalk.xlsx", trim_ws = TRUE) %>%
+  select(c("EIA Plant ID", "EPA/CAMD ORISPL ID"))
+
+# Turn tibble into named character vector for recode() function
+replacements <- replacements %>% deframe()
+
+# The !!! operator forces-splice the named character vector of plant code corrections
+# meaning that they each become one argument to the recode function instead of one character vector as an arugment
+# i.e. recode(c(a="1", b="2", c="3")) becomes recode(a="1", b="2", c="3")
+eia_gen <- eia_gen %>%
+  mutate(
+    NEW_PLANT_CODE = recode(EIA_PLANT_CODE, !!!replacements),
+    PLANT_CODE_CHANGE_FLAG = ifelse(EIA_PLANT_CODE != NEW_PLANT_CODE, 1, 0)
+  )
+```
+
+
+## Step 1: 
+
+Match by CAMD ORIS_Generator <-> EIA Plant Code_Generator
+
+This section matches CAMD to EIA data by the CAMD ORIS_CODE and GENID to EIA PLANT_CODE and GENERATOR_ID.
+```{r, echo = TRUE}
+# Join data
+crosswalk1 <-
+  left_join(unit_universe,
+    eia_gen,
+    by = c("ORIS_CODE" = "NEW_PLANT_CODE", "GENID" = "GENERATOR_ID")
+  )
+
+# Create a column that indicates if a match has occurred (allows counting of matches, as well as the ability to drop matches to leave only unmatched data for next iteration of matching)
+crosswalk1$MATCH1 <- case_when(
+  crosswalk1$CAMD == "X" &
+    crosswalk1$EIA == "X" ~ 1,
+  TRUE ~ 0
+)
+crosswalk1$MATCH_TYPE <- "Step 1: ORIS/GEN-PLANT/GEN"
+
+# Create list of units that matched in Step 1 (will try to combine all of these later)
+crosswalk1_match <- crosswalk1 %>%
+  filter(MATCH1 == 1)
+crosswalk1_match
+```
+
+### Match Summary
+```{r, echo = TRUE}
+# Create table of counts of matches for each step
+step1_match <- sum(crosswalk1$MATCH1 == 1, na.rm = TRUE)
+match_table <- tibble(
+  steps = "Step 1: ORIS/GEN-PLANT/GEN",
+  units_matched = c(step1_match),
+  units_unmatched = nrow(crosswalk1 %>% filter(CAMD == "X" &
+    MATCH1 == 0))
+)
+match_table
+
+
+# What's left unmatched in EIA's database after Step 1?
+crosswalk1_full <-
+  full_join(
+    unit_universe,
+    eia_gen,
+    by = c("ORIS_CODE" = "NEW_PLANT_CODE", "GENID" = "GENERATOR_ID"),
+    keep = TRUE
+  )
+crosswalk1_full$MATCH1 <- case_when(
+  crosswalk1_full$CAMD == "X" &
+    crosswalk1_full$EIA == "X" ~ 1,
+  TRUE ~ 0
+)
+
+
+crosswalk1_full$EIA_LEFTOVER <-
+  case_when(
+    crosswalk1_full$MATCH1 == 0 &
+      crosswalk1_full$EIA == "X" ~ 1,
+    TRUE ~ 0
+  )
+eia_unmatched <- crosswalk1_full %>%
+  filter(EIA_LEFTOVER == 1) %>%
+  filter(
+    EIA_FUEL_TYPE != "AB" &
+      EIA_FUEL_TYPE != "GEO" &
+      EIA_FUEL_TYPE != "MSW" &
+      EIA_FUEL_TYPE != "MWH" &
+      EIA_FUEL_TYPE != "NUC" &
+      EIA_FUEL_TYPE != "PUR" &
+      EIA_FUEL_TYPE != "SUN" &
+      EIA_FUEL_TYPE != "TDF" &
+      EIA_FUEL_TYPE != "WAT" &
+      EIA_FUEL_TYPE != "WND"
+  ) %>% # remove many non-fossil EIA units as they won't match to CAMD anyway
+  select(
+    starts_with("EIA"),
+    UNIT_TYPE,
+    NEW_PLANT_CODE,
+    PLANT_CODE_CHANGE_FLAG, -EIA_LEFTOVER
+  )
+```
+
+
+# The Fuzzy Steps: 
+
+After joining CAMD and EIA datasets based on CAMD GENID and EIA EIA_GENERATOR_ID, there are some generators left that are not matched. Many of these unmatched are due to small discrepencies in generator IDs, such as a special character or whitespace included in one dataset and not in the other. The facilities in question would otherwise match based on ORIS/PLANT_CODE but do not match based on GENID/GENERATOR_ID. 
+
+
+To solve this issue, we join these two datasets based on an exact match on ORIS/PLANT_CODE and an inexact match (via regex rules we define) on GENID/GENERATOR_ID. To accomplish this, the [fuzzyjoin](https://cran.r-project.org/web/packages/fuzzyjoin/index.html) and [stringr](https://cran.r-project.org/web/packages/stringr/stringr.pdf) R packages are used.
+
+
+With the fuzzyjoin package, the included function fuzzy_join allows us to define functions to be used for each column specified for a join operation. In this use case, we specify the join operations to be on the columns ORIS_CODE = NEW_PLANT_CODE (NEW_PLANT_CODE is the EIA plant code with replacements from known inconsistencies between CAMD and EIA plant codes performed in Step 0) and GENID = EIA_GENERATOR_ID. We define the two functions to join on these columns as exact equality '==' for ORIS_CODE = NEW_PLANT_CODE and custom functions using regex, with the stringr package, for GENID = EIA_GENERATOR_ID. Each custom function is described along with the expected results and examples before each step below.
+
+## Step 2a: 
+
+First, we match GENID to EIA_GENERATOR_ID based on the scenario where there may be a difference in case, whitespaces, or special characters. 
+
+Examples:
+
+* GENID = un14, EIA_GENERATOR_ID = UN14
+* GENID = CT2A, EIA_GENERATOR_ID = CT 2A
+* GENID = CT-1, EIA_GENERATOR_ID = CT1
+
+
+```{r, echo=TRUE}
+camd_unmatched <- crosswalk1 %>%
+  filter(MATCH1 == 0 & CAMD == "X") %>%
+  select(
+    ORIS_CODE,
+    UNITID,
+    GENID,
+    STATE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    FACILITY_NAME,
+    PRIMARY_FUEL_TYPE_DESC,
+    NAMEPLATE_CAPACITY,
+    CAMD
+  )
+
+
+# Match ignoring case, whitespace, and special characters
+# \\W = anything that is not a letter or number (special characters and whitespace)
+match_no_spec_chars <- function(x, y) {
+  str_to_upper(str_replace_all(x, "\\W", "")) == str_to_upper(str_replace_all(y, "\\W", ""))
+}
+
+crosswalk2a <- camd_unmatched %>%
+  fuzzy_full_join(
+    eia_unmatched,
+    by = c("ORIS_CODE" = "NEW_PLANT_CODE", "GENID" = "EIA_GENERATOR_ID"),
+    match_fun = list(
+      `==`,
+      match_no_spec_chars
+    )
+  )
+
+# Create a column that indicates if a match has occurred (allows counting of matches, as well as the ability to drop matches to leave only unmatched data for next iteration of matching)
+crosswalk2a$MATCH2a <- case_when(
+  crosswalk2a$CAMD == "X" &
+    crosswalk2a$EIA == "X" ~ 1,
+  TRUE ~ 0
+)
+crosswalk2a$MATCH_TYPE <-
+  "Step 2a: Remove case, special chars, and whitespace"
+
+crosswalk2a_match <- crosswalk2a %>%
+  filter(MATCH2a == 1)
+crosswalk2a_match
+```
+
+### Match Summary
+```{r, echo = TRUE}
+# Create table of counts of matches for each step
+match_table <- match_table %>%
+  add_row(
+    steps = "Step 2a: Remove case, special chars, and whitespace",
+    units_matched = nrow(crosswalk2a_match),
+    units_unmatched = nrow(crosswalk2a %>% filter(CAMD == "X" &
+      MATCH2a == 0))
+  )
+match_table
+```
+
+## Step 2b: 
+
+Next we address the scenario where the generator ID in each dataset is a number, but because the GENID/EIA_GENERATOR_ID column type is a string, they do not match via a normal join operation for trivial reasons, such as leading zeros in one generator ID and none in the other. In this step we try to convert each GENID, EIA_GENERATOR_ID to a number, using as.numeric(), then match based on the converted number. If a conversion is not possible on either generator ID, then the match fails.
+
+Examples:
+
+* GENID = 2, EIA_GENERATOR_ID = 02
+* GENID = 02, EIA_GENERATOR_ID = 2
+* GENID = 1, EIA_GENERATOR_ID = 0001
+
+
+```{r, echo=TRUE}
+camd_unmatched <- crosswalk2a %>%
+  filter(MATCH2a == 0 & CAMD == "X") %>%
+  select(
+    ORIS_CODE,
+    UNITID,
+    GENID,
+    STATE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    FACILITY_NAME,
+    PRIMARY_FUEL_TYPE_DESC,
+    NAMEPLATE_CAPACITY,
+    CAMD
+  )
+
+eia_unmatched <- crosswalk2a %>%
+  filter(MATCH2a == 0 & EIA == "X") %>%
+  select(
+    starts_with("EIA"),
+    UNIT_TYPE,
+    NEW_PLANT_CODE,
+    PLANT_CODE_CHANGE_FLAG
+  )
+
+# Try to convert each to numbers and match on that
+# for the cases where each may be a number, but have
+# leading zeros, which prevents a string match
+match_only_nums <- function(x, y) {
+  newX <- as.numeric(x)
+  newY <- as.numeric(y)
+  
+  !is.na(newX) & !is.na(newY) & newX == newY
+}
+
+crosswalk2b <- camd_unmatched %>%
+  fuzzy_full_join(
+    eia_unmatched,
+    by = c("ORIS_CODE" = "NEW_PLANT_CODE", "GENID" = "EIA_GENERATOR_ID"),
+    match_fun = list(
+      `==`,
+      match_only_nums
+    )
+  )
+
+# Create a column that indicates if a match has occurred (allows counting of matches, as well as the ability to drop matches to leave only unmatched data for next iteration of matching)
+crosswalk2b$MATCH2b <- case_when(
+  crosswalk2b$CAMD == "X" &
+    crosswalk2b$EIA == "X" ~ 1,
+  TRUE ~ 0
+)
+crosswalk2b$MATCH_TYPE <- "Step 2b: Convert to numbers and match"
+
+crosswalk2b_match <- crosswalk2b %>%
+  filter(MATCH2b == 1)
+crosswalk2b_match
+```
+
+
+### Match Summary
+```{r, echo = TRUE}
+# Create table of counts of matches for each step
+match_table <- match_table %>%
+  add_row(
+    steps = "Step 2b: Convert to numbers and match",
+    units_matched = nrow(crosswalk2b_match),
+    units_unmatched = nrow(crosswalk2b %>% filter(CAMD == "X" &
+      MATCH2b == 0))
+  )
+match_table
+```
+
+
+## Step 2c: 
+
+Next, we address the scenario where there is a number at the end of a generator ID in one dataset, but in the other dataset the same number exists but with extra characters in front (e.g 1 vs GT1). In this step, we extract numbers from the end of each GENID and match on those numbers.
+
+Examples: 
+
+* GENID = 6, EIA_GENERATOR_ID = NO.6
+* GENID = TG01, EIA_GENERATOR_ID = TGO1
+* GENID = AL1, EIA_GENERATOR_ID = AI1
+* GENID = STG5, EIA_GENERATOR_ID = GT5
+* GENID = CT3, EIA_GENERATOR_ID = 3
+* GENID = SGT1, EIA_GENERATOR_ID = GT1
+
+
+```{r,echo=TRUE}
+camd_unmatched <- crosswalk2b %>%
+  filter(MATCH2b == 0 & CAMD == "X") %>%
+  select(
+    ORIS_CODE,
+    UNITID,
+    GENID,
+    STATE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    FACILITY_NAME,
+    PRIMARY_FUEL_TYPE_DESC,
+    NAMEPLATE_CAPACITY,
+    CAMD
+  )
+
+eia_unmatched <- crosswalk2b %>%
+  filter(MATCH2b == 0 & EIA == "X") %>%
+  select(
+    starts_with("EIA"),
+    UNIT_TYPE,
+    NEW_PLANT_CODE,
+    PLANT_CODE_CHANGE_FLAG
+  )
+
+# only want to extract numbers when the number is the last thing in the string.
+# i.e. we don't want strings with 6A at the end only 6
+# we also need to handle the case when it's just a number
+match_trailing_nums <- function(x, y) {
+  newX <-
+    as.numeric(str_extract(x, "\\d+$"))
+  newY <-
+    as.numeric(str_extract(y, "\\d+$"))
+  
+  newX <- ifelse(is.na(newX), as.numeric(x), newX)
+  newY <- ifelse(is.na(newY), as.numeric(y), newY)
+  
+  !is.na(newX) & !is.na(newY) & newX == newY
+}
+
+
+# crosswalk2c
+crosswalk2c <- camd_unmatched %>%
+  fuzzy_full_join(
+    eia_unmatched,
+    by = c("ORIS_CODE" = "NEW_PLANT_CODE", "GENID" = "EIA_GENERATOR_ID"),
+    match_fun = list(
+      `==`,
+      match_trailing_nums
+    )
+  )
+
+# Create a column that indicates if a match has occurred (allows counting of matches, as well as the ability to drop matches to leave only unmatched data for next iteration of matching)
+crosswalk2c$MATCH2c <- case_when(
+  crosswalk2c$CAMD == "X" &
+    crosswalk2c$EIA == "X" ~ 1,
+  TRUE ~ 0
+)
+crosswalk2c$MATCH_TYPE <- "Step 2c: Trailing number matches"
+
+crosswalk2c_match <- crosswalk2c %>%
+  filter(MATCH2c == 1)
+crosswalk2c_match
+```
+
+
+### Match Summary
+```{r, echo = TRUE}
+# Create table of counts of matches for each step
+match_table <- match_table %>%
+  add_row(
+    steps = "Step 2c: Trailing number matches",
+    units_matched = nrow(crosswalk2c_match),
+    units_unmatched = nrow(crosswalk2c %>% filter(CAMD == "X" &
+      MATCH2c == 0))
+  )
+match_table
+
+# Create list of units that are still unmatched
+unmatched_units <- crosswalk2c %>%
+  filter(MATCH2c == 0)
+unmatched_units$UNMATCHED <- 1
+```
+## Step 2d: 
+
+Next, we address the scenario where there is a number at the front of a generator ID. In this step, we extract numbers from the front of each GENID and match on those numbers.
+
+Examples: 
+
+* GENID = 7-STG, EIA_GENERATOR_ID = 7S
+* GENID = 1, EIA_GENERATOR_ID = 1A
+
+
+```{r,echo=TRUE}
+camd_unmatched <- crosswalk2c %>%
+  filter(MATCH2c == 0 & CAMD == "X") %>%
+  select(
+    ORIS_CODE,
+    UNITID,
+    GENID,
+    STATE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    FACILITY_NAME,
+    PRIMARY_FUEL_TYPE_DESC,
+    NAMEPLATE_CAPACITY,
+    CAMD
+  )
+
+eia_unmatched <- crosswalk2c %>%
+  filter(MATCH2c == 0 & EIA == "X") %>%
+  select(
+    starts_with("EIA"),
+    UNIT_TYPE,
+    NEW_PLANT_CODE,
+    PLANT_CODE_CHANGE_FLAG
+  )
+
+# only want to extract numbers when the number is the last thing in the string.
+# i.e. we don't want strings with 6A at the end only 6
+# we also need to handle the case when one is just a number
+match_trailing_nums <- function(x, y) {
+  newX <-
+    as.numeric(str_extract(x, "^\\d+"))
+  newY <-
+    as.numeric(str_extract(y, "^\\d+"))
+  
+  newX <- ifelse(is.na(newX), as.numeric(x), newX)
+  newY <- ifelse(is.na(newY), as.numeric(y), newY)
+  
+  !is.na(newX) & !is.na(newY) & newX == newY
+}
+
+
+# crosswalk2d
+crosswalk2d <- camd_unmatched %>%
+  fuzzy_full_join(
+    eia_unmatched,
+    by = c("ORIS_CODE" = "NEW_PLANT_CODE", "GENID" = "EIA_GENERATOR_ID"),
+    match_fun = list(
+      `==`,
+      match_trailing_nums
+    )
+  )
+
+# Create a column that indicates if a match has occurred (allows counting of matches, as well as the ability to drop matches to leave only unmatched data for next iteration of matching)
+crosswalk2d$MATCH2d <- case_when(
+  crosswalk2d$CAMD == "X" &
+    crosswalk2d$EIA == "X" ~ 1,
+  TRUE ~ 0
+)
+crosswalk2d$MATCH_TYPE <- "Step 2d: Leading number matches"
+
+crosswalk2d_match <- crosswalk2d %>%
+  filter(MATCH2d == 1) %>%
+  relocate(EIA_GENERATOR_ID, .after = GENID)
+crosswalk2d_match
+```
+
+
+### Match Summary
+```{r, echo = TRUE}
+# Create table of counts of matches for each step
+match_table <- match_table %>%
+  add_row(
+    steps = "Step 2d: Leading number matches",
+    units_matched = nrow(crosswalk2d_match),
+    units_unmatched = nrow(crosswalk2d %>% filter(CAMD == "X" &
+      MATCH2d == 0))
+  )
+match_table
+
+# Create list of units that are still unmatched
+unmatched_units <- crosswalk2d %>%
+  filter(MATCH2d == 0)
+unmatched_units$UNMATCHED <- 1
+```
+
+## Step 2e: 
+
+Next, we address the scenario where there is a number-letter combination in each generator ID, which would otherwise match, despite characters in front. In this step, we extract number-letter combos from the end of each GENID and match on those.
+
+Examples: 
+
+* GENID = PFL6A, EIA_GENERATOR_ID = 6A
+* GENID = PFL6B, EIA_GENERATOR_ID = 6B
+
+```{r,echo=TRUE}
+camd_unmatched <- crosswalk2d %>%
+  filter(MATCH2d == 0 & CAMD == "X") %>%
+  select(
+    ORIS_CODE,
+    UNITID,
+    GENID,
+    STATE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    FACILITY_NAME,
+    PRIMARY_FUEL_TYPE_DESC,
+    NAMEPLATE_CAPACITY,
+    CAMD
+  )
+
+eia_unmatched <- crosswalk2d %>%
+  filter(MATCH2d == 0 & EIA == "X") %>%
+  select(
+    starts_with("EIA"),
+    NEW_PLANT_CODE,
+    UNIT_TYPE,
+    PLANT_CODE_CHANGE_FLAG
+  )
+
+# only extract cases where we have a number followed by letter(s)
+match_trailing_nums_w_letter <- function(x, y) {
+  newX <- str_extract(x, "\\d+[:alpha:]+$")
+  newY <- str_extract(y, "\\d+[:alpha:]+$")
+  
+  !is.na(newX) & !is.na(newY) & newX == newY
+}
+
+
+# crosswalk2e
+crosswalk2e <- camd_unmatched %>%
+  fuzzy_full_join(
+    eia_unmatched,
+    by = c("ORIS_CODE" = "NEW_PLANT_CODE", "GENID" = "EIA_GENERATOR_ID"),
+    match_fun = list(
+      `==`,
+    match_trailing_nums_w_letter
+    )
+  )
+
+# Create a column that indicates if a match has occurred (allows counting of matches, as well as the ability to drop matches to leave only unmatched data for next iteration of matching)
+crosswalk2e$MATCH2e <- case_when(
+  crosswalk2e$CAMD == "X" &
+    crosswalk2e$EIA == "X" ~ 1,
+  TRUE ~ 0
+)
+crosswalk2e$MATCH_TYPE <-
+  "Step 2e: Trailing number w/ letter matches"
+
+crosswalk2e_match <- crosswalk2e %>%
+  filter(MATCH2e == 1) %>%
+  relocate(EIA_GENERATOR_ID, .after = GENID)
+crosswalk2e_match
+```
+
+
+### Match Summary
+```{r, echo = TRUE}
+# Create table of counts of matches for each step
+match_table <- match_table %>%
+  add_row(
+    steps = "Step 2e: Trailing number w/ letter matches",
+    units_matched = nrow(crosswalk2e_match),
+    units_unmatched = nrow(crosswalk2e %>% filter(CAMD == "X" &
+      MATCH2e == 0))
+  )
+match_table
+
+# Create list of units that are still unmatched
+unmatched_units <- crosswalk2e %>%
+  filter(MATCH2e == 0)
+unmatched_units$UNMATCHED <- 1
+```
+
+
+## Step 2f: 
+
+Next, we will extract numbers from anywhere in either generator ID and match on those numbers.
+
+Examples: 
+
+* GENID = MGS1A, EIA_GENERATOR_ID = MGS1
+* GENID = 1A, EIA_GENERATOR_ID = M1 **
+
+
+```{r,echo=TRUE}
+camd_unmatched <- crosswalk2e %>%
+  filter(MATCH2e == 0 & CAMD == "X") %>%
+  select(
+    ORIS_CODE,
+    UNITID,
+    GENID,
+    STATE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    FACILITY_NAME,
+    PRIMARY_FUEL_TYPE_DESC,
+    NAMEPLATE_CAPACITY,
+    CAMD
+  )
+
+eia_unmatched <- crosswalk2e %>%
+  filter(MATCH2e == 0 & EIA == "X") %>%
+  select(
+    starts_with("EIA"),
+    NEW_PLANT_CODE,
+    UNIT_TYPE,
+    PLANT_CODE_CHANGE_FLAG
+  )
+
+# extract any numbers within either generator ID
+match_any_nums <- function(x, y) {
+  newX <- str_extract(x, "\\d+")
+  newY <- str_extract(y, "\\d+")
+  
+  !is.na(newX) & !is.na(newY) & newX == newY
+}
+
+
+# crosswalk2f
+crosswalk2f <- camd_unmatched %>%
+  fuzzy_full_join(
+    eia_unmatched,
+    by = c("ORIS_CODE" = "NEW_PLANT_CODE", "GENID" = "EIA_GENERATOR_ID"),
+    match_fun = list(
+      `==`,
+      match_any_nums
+    )
+  )
+
+# Create a column that indicates if a match has occurred (allows counting of matches, as well as the ability to drop matches to leave only unmatched data for next iteration of matching)
+crosswalk2f$MATCH2f <- case_when(
+  crosswalk2f$CAMD == "X" &
+    crosswalk2f$EIA == "X" ~ 1,
+  TRUE ~ 0
+)
+crosswalk2f$MATCH_TYPE <- "Step 2f: Any number matches"
+
+crosswalk2f_match <- crosswalk2f %>%
+  filter(MATCH2f == 1) %>%
+  relocate(EIA_GENERATOR_ID, .after = GENID)
+crosswalk2f_match
+```
+
+
+### Match Summary
+```{r, echo = TRUE}
+# Create table of counts of matches for each step
+match_table <- match_table %>%
+  add_row(
+    steps = "Step 2f: Any number matches",
+    units_matched = nrow(crosswalk2f_match),
+    units_unmatched = nrow(crosswalk2f %>% filter(CAMD == "X" &
+      MATCH2f == 0))
+  )
+match_table
+
+# Create list of units that are still unmatched
+unmatched_units <- crosswalk2f %>%
+  filter(MATCH2f == 0)
+unmatched_units$UNMATCHED <- 1
+```
+
+
+## Unmatched after all Steps
+
+```{r,echo = TRUE}
+camd_unmatched <- crosswalk2f %>%
+  filter(MATCH2f == 0 & CAMD == "X") %>%
+  select(
+    ORIS_CODE,
+    UNITID,
+    GENID,
+    STATE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    FACILITY_NAME,
+    PRIMARY_FUEL_TYPE_DESC,
+    NAMEPLATE_CAPACITY,
+    PLANT_CODE_CHANGE_FLAG,
+    CAMD
+  )
+
+camd_unmatched <- camd_unmatched %>%
+  mutate(MATCH_TYPE = case_when(
+    str_detect(ORIS_CODE, "^(88)\\d{4}") ~ "unmatched, not grid connected",
+    is.na(GENID) ~ "unmatched, No CAMD GENID",
+    TRUE ~ "unmatched"
+  ))
+
+eia_unmatched <- crosswalk2f %>%
+  filter(MATCH2f == 0 & EIA == "X") %>%
+  select(
+    starts_with("EIA"),
+    NEW_PLANT_CODE,
+    UNIT_TYPE,
+    PLANT_CODE_CHANGE_FLAG
+  )
+
+# Create list of units that are still unmatched
+all_unmatched <- crosswalk2f %>%
+  filter(MATCH2f == 0)
+all_unmatched$UNMATCHED <- 1
+
+
+# Create table of counts of matches for each step
+# The matched and unmatched numbers here will not make sense, because the same CAMD ORIS_CODE/GENID pair
+# will match with multiple EIA_PLANT_CODE/EIA_GENERATOR_ID pairs.
+match_table <- match_table %>%
+  add_row(
+    steps = "No CAMD GENID",
+    units_matched = nrow(camd_unmatched %>% filter(is.na(GENID))),
+    units_unmatched = nrow(camd_unmatched %>% filter(!is.na(GENID)))
+  )
+match_table
+```
+
+
+## Create Crosswalk
+This section creates the final crosswalk spreadsheet, retaining information from both the CAMD and EIA databases for users to properly match units.
+```{r}
+camd_eia_crosswalk <-
+  bind_rows(
+    crosswalk1_match,
+    crosswalk2a_match,
+    crosswalk2b_match,
+    crosswalk2c_match,
+    crosswalk2d_match,
+    crosswalk2e_match,
+    crosswalk2f_match,
+    camd_unmatched
+  ) %>%
+  select(
+    CAMD_ORIS_CODE = "ORIS_CODE",
+    CAMD_GENERATOR_ID = "GENID",
+    CAMD_UNIT_ID = "UNITID",
+    CAMD_FACILITY_NAME = "FACILITY_NAME",
+    CAMD_STATE = "STATE",
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    CAMD_PRIM_FUEL = "PRIMARY_FUEL_TYPE_DESC",
+    CAMD_NAMEPLATE_CAPACITY = "NAMEPLATE_CAPACITY",
+    EIA_PLANT_CODE,
+    EIA_GENERATOR_ID,
+    EIA_PLANT_NAME,
+    EIA_STATE,
+    EIA_LATITUDE,
+    EIA_LONGITUDE,
+    EIA_FUEL_TYPE,
+    EIA_NAMEPLATE_CAPACITY,
+    PLANT_CODE_CHANGE_FLAG,
+    MATCH_TYPE
+  )
+camd_eia_crosswalk
+
+# Create/modify xlsx workbook and worksheet to add text format to cells, preventing excel from
+# changing some GENIDs and UNIT_IDs to dates
+if (!file.exists("camd_eia_crosswalk.xlsx")) {
+  wb <- createWorkbook()
+
+} else {
+  wb <- loadWorkbook("camd_eia_crosswalk.xlsx")
+  # must remove worksheet to replace the data
+  removeWorksheet(wb, "camd_eia_crosswalk")
+}
+
+addWorksheet(wb, "camd_eia_crosswalk")
+
+# The numFmt = TEXT specifies text format for the cells,
+# thus avoiding the automatic conversion to dates
+# (e.g. 6-1 and 1-1 wont be converted to Jun-1, Jan-1) when "GENERAL" format is used
+textstyle <- createStyle(fontName = "Calibri", fontSize = 11, numFmt = "TEXT")
+
+writeDataTable(wb = wb, sheet = "camd_eia_crosswalk", x = camd_eia_crosswalk)
+
+addStyle(
+  wb = wb, sheet = "camd_eia_crosswalk",
+  rows = 1:nrow(camd_eia_crosswalk), cols = 1:ncol(camd_eia_crosswalk),
+  style = textstyle, gridExpand = TRUE
+)
+
+saveWorkbook(wb, "camd_eia_crosswalk.xlsx", overwrite = TRUE)
+
+# For a more accesible document, output csv, but if used in Excel, some GENIDs will be
+# interpreted as dates.
+write_excel_csv(camd_eia_crosswalk,
+  "camd_eia_crosswalk.csv",
+  col_names = TRUE,
+  na = ""
+)
+```

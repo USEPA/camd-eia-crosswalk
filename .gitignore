@@ -1,0 +1,10 @@
+*.html
+*.RData
+*.Rhistory
+*.zip
+*.xlsx
+*.csv
+*.pdf
+!data/state_reference.csv
+!camd_eia_crosswalk.csv
+!camd_eia_crosswalk.xlsx
