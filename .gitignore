@@ -6,5 +6,9 @@
 *.csv
 *.pdf
 !data/state_reference.csv
-!camd_eia_crosswalk.csv
-!camd_eia_crosswalk.xlsx
+!examples/sample_data/camd_sample_data.csv
+!manual_matches.xlsx
+!epa_eia_crosswalk.csv
+!epa_eia_crosswalk.xlsx
+!field_descriptions.csv
+.Rproj.user

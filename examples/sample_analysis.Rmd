@@ -1,0 +1,123 @@
+---
+title: "Sample Analysis Using the EPA-EIA Crosswalk"
+author: "EPA Clean Air Markets Division"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+This analysis is provided alongside the EPA-EIA Crosswalk development code to demonstrate how the crosswalk can be used.
+
+In this sample analysis, CAMD and EIA data are joined to generate annual NO~X~ emission rates for all coal electric generating units (EGUs) in Alabama based on the NO~X~ emissions data from CAMD and net generation data from EIA for the year 2018. These rates will be plotted in a scatter plot against net generation.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+
+#libraries
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(scales)
+
+#disable scientific notation
+options(scipen = 999)
+
+#set working directory
+#This path specification will ensure that any user can run the code as long as the Rmd document is located in the same directory as the data and crosswalk.
+setwd("./")
+
+```
+
+The CAMD data was downloaded a priori from a query in the Air Markets Program Data (AMPD) tool (https://ampd.epa.gov/ampd/) for grid-connected EGUs affected by all CAMD programs in Alabama for the year 2018.
+
+The EIA data is pulled straight from the EIA-923 website in the code below.
+
+```{r import-data}
+#import CAMD data
+camd_data <- read_csv("sample_data/camd_sample_data.csv") %>%
+  select(
+    CAMD_PLANT_ID = "Facility ID (ORISPL)",
+    CAMD_UNIT_ID = "Unit ID",
+    CAMD_PLANT_NAME = "Facility Name",
+    CAMD_STATE = "State",
+    NOX_EMISSIONS_TONS = "NOx (tons)",
+    FUEL_TYPE = "Fuel Type (Primary)",
+    NOX_CONTROL = "NOx Control(s)"
+  )
+
+#import EIA data
+eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia923/archive/xls/f923_2018.zip")
+download.file(eia_data_file, str_glue("./sample_data/eiaf923_2018.zip"))
+unzip(zipfile = "sample_data/eiaf923_2018.zip", exdir = "sample_data")
+eia_data <- read_excel(
+    str_glue("sample_data/EIA923_Schedules_2_3_4_5_M_12_2018_Final_Revision.xlsx"),
+    sheet = "Page 4 Generator Data",
+    skip = 5,
+    trim_ws = TRUE,
+    .name_repair = "universal"
+  ) %>%
+  select(
+    EIA_PLANT_ID = "Plant.Id",
+    EIA_GENERATOR_ID = "Generator.Id",
+    EIA_PLANT_NAME = "Plant.Name",
+    EIA_STATE = "Plant.State",
+    NET_GEN = "Net.Generation..Year.To.Date"
+  )
+
+#import crosswalk
+crosswalk <- read_csv("sample_data/camd_eia_crosswalk.csv") %>%
+  select(
+    CAMD_PLANT_ID,
+    CAMD_UNIT_ID,
+    CAMD_GENERATOR_ID,
+    EIA_PLANT_ID,
+    EIA_GENERATOR_ID,
+    EIA_UNIT_TYPE
+  )
+
+```
+
+This section integrates the crosswalk by first joining it to the existing CAMD data on the plant ID (ORIS code) and unit ID. It then joins the EIA data to this data frame on the plant ID and generator ID.
+
+```{r crosswalk}
+#implement crosswalk
+camd_data_crosswalk <- left_join(camd_data, crosswalk, by = c("CAMD_PLANT_ID" = "CAMD_PLANT_ID", "CAMD_UNIT_ID" = "CAMD_UNIT_ID"))
+
+camd_eia_data_raw <- left_join(camd_data_crosswalk, eia_data, by = c("EIA_PLANT_ID" = "EIA_PLANT_ID", "EIA_GENERATOR_ID" = "EIA_GENERATOR_ID"))
+```
+
+Some additional data prep is needed in the section below, including filtering for just the coal EGUs and calculating NO~X~ emission rates in pounds per megawatt-hour (lb/MWh).
+
+```{r data-prep}
+#apply state and fuel filter
+camd_eia_data_raw_coal <- camd_eia_data_raw %>%
+  filter(grepl("Coal", FUEL_TYPE)) %>%
+  filter(CAMD_PLANT_ID < 880000) #filter out non-grid-connected units
+
+camd_eia_data_coal <- camd_eia_data_raw_coal %>%
+  mutate(NOX_EMISSIONS_LBS = NOX_EMISSIONS_TONS*2000) %>%
+  mutate(NOX_RATE = NOX_EMISSIONS_LBS/NET_GEN)
+```
+
+Finally, this section creates a plot of the NO~X~ emission rates versus net generation, which shows that EGUs that produce more electricity tend to have lower NO~X~ emission rates.
+
+```{r nox-rate-plot}
+#plot unit-level NOX rates against net generation
+AL_coal_noxr <- ggplot(camd_eia_data_coal, aes(x = NET_GEN, y = NOX_RATE, color = CAMD_PLANT_NAME)) +
+  geom_point() +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  scale_x_continuous(label = comma) +
+  scale_y_continuous(labels = scales::number_format(accuracy = 0.1)) +
+#some data labels overlap, the next lines of code manually change the placement of certain overlapping labels
+  geom_text(aes(label = paste('Unit', CAMD_UNIT_ID)), size = 3,
+            hjust = if_else(camd_eia_data_coal$CAMD_PLANT_NAME == 'International Paper-Prattville Mill' & camd_eia_data_coal$CAMD_UNIT_ID == 'Z008' | camd_eia_data_coal$CAMD_PLANT_NAME == 'James H Miller Jr' & camd_eia_data_coal$CAMD_UNIT_ID == '3', 1, -0.2),
+            vjust = if_else(camd_eia_data_coal$CAMD_PLANT_NAME == 'International Paper-Prattville Mill' & camd_eia_data_coal$CAMD_UNIT_ID == 'Z008'| camd_eia_data_coal$CAMD_PLANT_NAME == 'James H Miller Jr' & camd_eia_data_coal$CAMD_UNIT_ID == '3', -0.4, 0.5),
+            show.legend = FALSE) +
+  labs(x = 'Net Generation (MWh)', y = expression('NO'['X'] * ' Rate (lb/MWh)'),
+       title = expression('Alabama Coal EGUs Annual Average NO'['X'] * ' Rates by Net Generation 2018'),
+       color = 'Facility Name')
+AL_coal_noxr
+```
+

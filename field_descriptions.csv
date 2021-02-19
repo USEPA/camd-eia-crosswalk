@@ -1,0 +1,34 @@
+Column Name,Description
+SEQUENCE NUMBER,Row number assigned to each observation. Included for purposes of sorting to original order.
+CAMD_STATE,The state where the facility is located in CAMD's data.
+CAMD_FACILITY_NAME,The name of the facility in CAMD's data.
+CAMD_PLANT_ID,The unique ID (also known as ORIS code/ORISPL code) of the facility in CAMD's data. (CAMD key)
+CAMD_UNIT_ID,The unique ID for a combustion unit at a facility in CAMD's data. (CAMD key)
+CAMD_GENERATOR_ID,The unique ID for a generator at a facility in CAMD's data. (CAMD key)
+CAMD_NAMEPLATE_CAPACITY,"The maximum rated output of the generator in CAMD's data, prime mover, or other electric power production equipment under specific conditions designated by the manufacturer. Expressed in MW."
+CAMD_FUEL_TYPE,The primary fuel type for the unit in CAMD's data.
+CAMD_LATITUDE,The latitude of the facility in CAMD's data.
+CAMD_LONGITUDE,The longitude of the facility in CAMD's data.
+CAMD_STATUS,"The status of the unit in CAMD's data. Either OPR (Operating), LTCS (Long-term cold storage), or RET (Retired)."
+CAMD_STATUS_DATE,"The date on which the status of the unit last changed in CAMD's data. For example, the date on which the unit changed from operating to retired. "
+CAMD_RETIRE_YEAR,The year in which the unit retired in CAMD's data.
+MOD_CAMD_UNIT_ID,The resulting CAMD unit ID used to create a match between CAMD and EIA. It may be the same as the original if it was matched without modifications.
+MOD_CAMD_GENERATOR_ID,The resulting CAMD generator ID used to create a match between CAMD and EIA. It may be the same as the original if it was matched without modifications.
+EIA_STATE,The state where the facility is located in EIA's data.
+EIA_PLANT_NAME,The name of the facility in EIA's data.
+EIA_PLANT_ID,The unique ID of the facility in EIA's data. (EIA key)
+EIA_GENERATOR_ID,The unique ID for a generator at a facility in EIA's data. (EIA key)
+EIA_NAMEPLATE_CAPACITY,The highest value on the generator nameplate in megawatts rounded to the nearest tenth. Expressed in MW.
+EIA_BOILER_ID,The unique ID for a steam boiler unit at a facility in EIA's data. (EIA key)
+EIA_UNIT_TYPE,"The prime mover (devices-e.g., gas turbine, steam turbine-that convert fuels to electrical energy via a generator) for an EIA unit. See reference table 2 in EIA-860 LayoutY{data_year}.xlsx or https://www.epa.gov/sites/production/files/2017-01/egrid_code_lookup.xlsx"
+EIA_FUEL_TYPE,The primary fuel type for the unit in EIA's data.
+EIA_LATITUDE,The latitude of the facility in EIA's data.
+EIA_LONGITUDE,The longitude of the facility in EIA's data.
+EIA_RETIRE_YEAR,The year in which the unit retired in EIA's data.
+PLANT_ID_CHANGE_FLAG,A flag to indicate whether the EIA Plant ID was changed to match a CAMD ORIS Code according to a list of known discrepancies between CAMD ORIS code and EIA Plant ID. The list is linked in the README.
+MOD_EIA_PLANT_ID,"The resulting EIA plant ID used to create a match between CAMD and EIA before any matching occurs. See ""plant_id_manual_matches"" sheet within the manual matches file."
+MOD_EIA_BOILER_ID,The resulting EIA boiler ID used to create a match between CAMD and EIA during Step 2. It may be the same as the original if it was matched without modifications.
+MOD_EIA_GENERATOR_ID_BOILER,The resulting EIA generator ID used to create a match between CAMD and EIA during Step 2. It may be the same as the original if it was matched without modifications.
+MOD_EIA_GENERATOR_ID_GEN,"The resulting EIA generator ID used to create a match between CAMD and EIA during Step 1, matching CAMD generators to EIA generators on CAMD and EIA plant and generator IDs. It may be the same as the original if it was matched without modifications."
+MATCH_TYPE_GEN,"The type of match made during Step 1, matching CAMD generators to EIA generators on CAMD and EIA plant and generator IDs. Any applied modifier sub-steps are also indicated in this field."
+MATCH_TYPE_BOILER,"The type of match made during Step 2, matching CAMD units and generators to EIA boilers and generators on CAMD and EIA plant, unit/boiler, and generator IDs. Any applied modifier sub-steps are also indicated in this field."

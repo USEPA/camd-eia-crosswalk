@@ -1,0 +1,102 @@
+State, Facility Name, Facility ID (ORISPL), Unit ID, Associated Stacks, Year, Program(s), Gross Load (MW-h), NOx (tons), Heat Input (MMBtu), Operating Status, Unit Type, Fuel Type (Primary), NOx Control(s)
+AL,AMEA Sylacauga Plant,56018,1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",17552,7.238,189644.8,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,AMEA Sylacauga Plant,56018,2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",18411,7.959,196061.1,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Ascend (Decatur Plant),880041,X015,,2018,SIPNOX,,436.967,3470239.075,Operating,Dry bottom wall-fired boiler,Natural Gas,Selective Non-catalytic Reduction
+AL,Ascend (Decatur Plant),880041,Z005,CS001,2018,SIPNOX,,,,Operating (Retired 09/19/2018),Stoker,Coal,Selective Non-catalytic Reduction
+AL,Ascend (Decatur Plant),880041,Z006,CS001,2018,SIPNOX,,71.608,271656.725,Operating,Stoker,Coal,Selective Non-catalytic Reduction
+AL,Barry,3,1,CS0AAN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",31456,16.8,457388.975,Operating,Tangentially-fired,Pipeline Natural Gas,Low NOx Burner Technology w/ Closed-coupled OFA<br>Selective Non-catalytic Reduction
+AL,Barry,3,2,CS0AAN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",30676.25,16.761,458812.7,Operating,Tangentially-fired,Pipeline Natural Gas,Low NOx Burner Technology w/ Closed-coupled OFA<br>Selective Non-catalytic Reduction
+AL,Barry,3,4,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",979760.5,1193.851,1.06E+07,Operating,Tangentially-fired,Coal,Low NOx Burner Technology w/ Separated OFA<br>Selective Non-catalytic Reduction
+AL,Barry,3,5,"MS5C, MS5D, MS5E",2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",3388899.25,1095.209,3.33E+07,Operating,Tangentially-fired,Coal,Low NOx Burner Technology w/ Separated OFA<br>Selective Catalytic Reduction
+AL,Barry,3,6A,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2135378,58.08,1.48E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Barry,3,6B,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2101689.5,61.425,1.49E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Barry,3,7A,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2031148,59.25,1.44E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Barry,3,7B,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2008646.5,58.645,1.42E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Calhoun Energy Center,55409,CT1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",58560.67,16.565,651309.047,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection
+AL,Calhoun Energy Center,55409,CT2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",32018.53,7.947,353221.131,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection
+AL,Calhoun Energy Center,55409,CT3,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",47109.58,12.201,519700.321,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection
+AL,Calhoun Energy Center,55409,CT4,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",60637.63,16.949,676747.06,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection
+AL,Central Alabama Gen Station,55440,CTGDB1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1498507.55,58.216,1.16E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection<br>Selective Catalytic Reduction
+AL,Central Alabama Gen Station,55440,CTGDB2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1415962.61,49.955,1.09E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection<br>Selective Catalytic Reduction
+AL,Central Alabama Gen Station,55440,CTGDB3,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1341399.83,52.038,1.02E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection<br>Selective Catalytic Reduction
+AL,Charles R Lowman,56,1,CS004,2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",29648.31,45.986,307548.801,Operating,Dry bottom wall-fired boiler,Coal,Low NOx Burner Technology (Dry Bottom only)
+AL,Charles R Lowman,56,2,CS004,2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",910105.5,1516.332,8939405.665,Operating,Dry bottom wall-fired boiler,Coal,Selective Catalytic Reduction<br>Overfire Air
+AL,Charles R Lowman,56,3,"MS03C, MS03D",2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",503880.78,808.483,5028380.633,Operating,Dry bottom wall-fired boiler,Coal,Selective Catalytic Reduction<br>Overfire Air
+AL,Colbert,47,CCT1,,2018,"CSNOX, CSOSG2, CSSO2G2",9714,48.581,138335.3,Operating,Combustion turbine,Pipeline Natural Gas,
+AL,Colbert,47,CCT2,,2018,"CSNOX, CSOSG2, CSSO2G2",9822,49.907,142202.8,Operating,Combustion turbine,Pipeline Natural Gas,
+AL,Colbert,47,CCT3,,2018,"CSNOX, CSOSG2, CSSO2G2",7586,38.864,111019.6,Operating,Combustion turbine,Pipeline Natural Gas,
+AL,Colbert,47,CCT4,,2018,"CSNOX, CSOSG2, CSSO2G2",11832,58.522,166426.4,Operating,Combustion turbine,Pipeline Natural Gas,
+AL,Colbert,47,CCT5,,2018,"CSNOX, CSOSG2, CSSO2G2",8695,43.86,126862.5,Operating,Combustion turbine,Pipeline Natural Gas,
+AL,Colbert,47,CCT6,,2018,"CSNOX, CSOSG2, CSSO2G2",8010,40.485,117082.5,Operating,Combustion turbine,Pipeline Natural Gas,
+AL,Colbert,47,CCT7,,2018,"CSNOX, CSOSG2, CSSO2G2",6322,32.091,91542.5,Operating,Combustion turbine,Pipeline Natural Gas,
+AL,Colbert,47,CCT8,,2018,"CSNOX, CSOSG2, CSSO2G2",7652,39.339,112343.9,Operating,Combustion turbine,Pipeline Natural Gas,
+AL,Decatur Energy Center,55292,CTG-1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",898495.39,27.387,6442025.71,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Decatur Energy Center,55292,CTG-2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",940881.05,25.744,6874010.565,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Decatur Energy Center,55292,CTG-3,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",956810.17,31.868,6977576.851,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,E B Harris Generating Plant,7897,1A,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1437743,50.014,9775406.675,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,E B Harris Generating Plant,7897,1B,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1446377.5,49.028,9807531,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,E B Harris Generating Plant,7897,2A,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1559377.75,47.933,1.06E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,E B Harris Generating Plant,7897,2B,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1557529,48.286,1.05E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,E C Gaston,26,1,CS0CAN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",835801.75,662.344,8754099.7,Operating,Dry bottom wall-fired boiler,Pipeline Natural Gas,Low NOx Burner Technology (Dry Bottom only)
+AL,E C Gaston,26,2,CS0CAN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1136783.25,969.667,1.22E+07,Operating,Dry bottom wall-fired boiler,Pipeline Natural Gas,Low NOx Burner Technology (Dry Bottom only)
+AL,E C Gaston,26,3,CS0CBN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",761352.75,568.438,7773457.65,Operating,Dry bottom wall-fired boiler,Pipeline Natural Gas,Low NOx Burner Technology (Dry Bottom only)
+AL,E C Gaston,26,4,CS0CBN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",812150.75,569.106,7701360.925,Operating,Dry bottom wall-fired boiler,Pipeline Natural Gas,Low NOx Burner Technology (Dry Bottom only)
+AL,E C Gaston,26,5,"MS5A, MS5B",2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",3057338,1725.491,3.36E+07,Operating,Tangentially-fired,Coal,Low NOx Burner Technology w/ Separated OFA<br>Selective Catalytic Reduction
+AL,Gadsden,7,1,CS0BAN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",,157.485,2662973.05,Operating,Tangentially-fired,Pipeline Natural Gas,
+AL,Gadsden,7,2,CS0BAN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",,37.925,671528.425,Operating,Tangentially-fired,Pipeline Natural Gas,
+AL,Gorgas,8,10,CS0DCN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",4655283.25,3748.674,4.73E+07,Operating,Tangentially-fired,Coal,Low NOx Burner Technology w/ Separated OFA<br>Selective Catalytic Reduction
+AL,Gorgas,8,8,CS0DCN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",516408.5,618.285,5387087.025,Operating,Tangentially-fired,Coal,Low NOx Burner Technology w/ Closed-coupled/Separated OFA
+AL,Gorgas,8,9,CS0DCN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",747069,888.062,7979558.475,Operating,Tangentially-fired,Coal,Low NOx Burner Technology w/ Closed-coupled/Separated OFA
+AL,Greene County,10,1,CS0EBN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",719363,472.429,7082282.775,Operating,Cell burner boiler,Pipeline Natural Gas,Low NOx Cell Burner
+AL,Greene County,10,2,CS0EBN,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",483697,335.793,4859816.3,Operating,Dry bottom wall-fired boiler,Pipeline Natural Gas,Low NOx Burner Technology (Dry Bottom only)
+AL,Greene County,10,CT10,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",4456.25,2.707,59926.65,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Greene County,10,CT2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",6600.5,4.101,90191.425,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Greene County,10,CT3,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2515.75,1.311,34653.225,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Greene County,10,CT4,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",8433.25,5.097,116233.525,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Greene County,10,CT5,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",8315,3.865,114484.95,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Greene County,10,CT6,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",10179.5,5.742,139142.2,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Greene County,10,CT7,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",11028.5,7.169,152013.7,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Greene County,10,CT8,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2495.75,1.54,34228.75,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Greene County,10,CT9,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",3264,1.712,45062.125,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Hillabee Energy Center,55411,CT1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2208389.74,61.187,1.55E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Hillabee Energy Center,55411,CT2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2266896.11,61.668,1.57E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Hog Bayou Energy Center,55241,COG01,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1158017.67,47.905,8557477.56,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection<br>Selective Catalytic Reduction
+AL,"Indorama Ventures Xylenes and PTA, LLC",880075,AB8301,,2018,SIPNOX,,19.69,1406400,Operating,Other boiler,Natural Gas,
+AL,International Paper-Prattville Mill,52140,Z006,"MS1N, MS1S",2018,SIPNOX,,377.899,2505017.629,Operating,Other boiler,Pipeline Natural Gas,
+AL,International Paper-Prattville Mill,52140,Z008,"MS2N, MS2S",2018,SIPNOX,,409.633,3764089.508,Operating,Other boiler,Coal,
+AL,International Paper-Riverdale Mill,54096,X026,,2018,SIPNOX,114900.31,50.152,1495190.562,Operating,Combined cycle,Pipeline Natural Gas,Steam Injection
+AL,International Paper-Riverdale Mill,54096,Z007,,2018,SIPNOX,,55.612,164054.159,Operating,Dry bottom wall-fired boiler,Pipeline Natural Gas,
+AL,James H Miller Jr,6002,1,"MS1A, MS1B",2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",4176110.5,1438.372,4.26E+07,Operating,Dry bottom wall-fired boiler,Coal,Selective Catalytic Reduction<br>Low NOx Burner Technology (Dry Bottom only)
+AL,James H Miller Jr,6002,2,"MS2A, MS2B",2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",3950169,1175.786,3.57E+07,Operating,Dry bottom wall-fired boiler,Coal,Selective Catalytic Reduction<br>Low NOx Burner Technology (Dry Bottom only)
+AL,James H Miller Jr,6002,3,"MS3A, MS3B",2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",5718125.5,1934.698,5.43E+07,Operating,Dry bottom wall-fired boiler,Coal,Selective Catalytic Reduction<br>Low NOx Burner Technology (Dry Bottom only)
+AL,James H Miller Jr,6002,4,"MS4A, MS4B",2018,"ARP, CSNOX, CSOSG2, CSSO2G2, MATS",5659120.75,1937.867,5.95E+07,Operating,Dry bottom wall-fired boiler,Coal,Selective Catalytic Reduction<br>Low NOx Burner Technology (Dry Bottom only)
+AL,McIntosh (7063),7063,**1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",6444.63,3.38,31509.676,Operating,Other turbine,Pipeline Natural Gas,
+AL,McIntosh (7063),7063,**2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",40637.58,13.088,431717.605,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners
+AL,McIntosh (7063),7063,**3,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",38089.33,12.114,435990.491,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners
+AL,McIntosh (7063),7063,**4,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",179187.91,35.874,1852763.247,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners
+AL,McIntosh (7063),7063,**5,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",183674.19,36.873,1900090.84,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners
+AL,McWilliams,533,**4,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",241530.72,88.721,2907437.567,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection
+AL,McWilliams,533,**V1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1260769.48,74.326,1.34E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,McWilliams,533,**V2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1198016.79,69.82,1.27E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Morgan Energy Center,55293,CT-1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1701264.02,46.872,1.26E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Morgan Energy Center,55293,CT-2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1240166.54,37.179,9187471.45,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Morgan Energy Center,55293,CT-3,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1733770.47,45.217,1.26E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Plant H. Allen Franklin,7710,1A,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2110261,60.91,1.40E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Plant H. Allen Franklin,7710,1B,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2119376,58.599,1.38E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Plant H. Allen Franklin,7710,2A,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2101874,62.492,1.43E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Plant H. Allen Franklin,7710,2B,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2125191.75,60.704,1.43E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Plant H. Allen Franklin,7710,3A,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2048521,61.699,1.40E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Plant H. Allen Franklin,7710,3B,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",2078653.25,66.528,1.40E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,SABIC Innovative Plastics - Burkville,7698,CC1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",934432.5,83.922,6406470.7,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners
+AL,Tenaska Lindsay Hill Generating Station,55271,CT1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",645229.21,18.948,4634072.428,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection<br>Selective Catalytic Reduction
+AL,Tenaska Lindsay Hill Generating Station,55271,CT2,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",619681.27,17.972,4431706.734,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection<br>Selective Catalytic Reduction
+AL,Tenaska Lindsay Hill Generating Station,55271,CT3,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",669604.15,19.746,4937906.27,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Water Injection<br>Selective Catalytic Reduction
+AL,Theodore Cogeneration,7721,CC1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1790457.25,44.203,1.18E+07,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners<br>Selective Catalytic Reduction
+AL,Walton Discover Power Facility,55138,1A,,2018,"CSNOX, CSOSG2, CSSO2G2",7153.36,10.339,89821.531,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Walton Discover Power Facility,55138,1B,,2018,"CSNOX, CSOSG2, CSSO2G2",7480.48,15.167,93137.868,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Walton Discover Power Facility,55138,2A,,2018,"CSNOX, CSOSG2, CSSO2G2",37.8,0.045,512.161,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Walton Discover Power Facility,55138,2B,,2018,"CSNOX, CSOSG2, CSSO2G2",38.32,0.051,542.913,Operating,Combustion turbine,Pipeline Natural Gas,Water Injection
+AL,Washington County Cogen (Olin),7697,CC1,,2018,"ARP, CSNOX, CSOSG2, CSSO2G2",1373940.25,184.175,8813778.125,Operating,Combined cycle,Pipeline Natural Gas,Dry Low NOx Burners
+AL,"WestRock CP, LLC",880101,PB3,,2018,SIPNOX,,48.801,1135890,Operating,Dry bottom wall-fired boiler,Pipeline Natural Gas,Low NOx Burner Technology (Dry Bottom only)
+AL,WestRock Coated Board,54802,X022,,2018,SIPNOX,72712.65,762.095,1087685.859,Operating,Combustion turbine,Pipeline Natural Gas,Dry Low NOx Burners
+AL,WestRock Coated Board,54802,Z008,,2018,SIPNOX,,30.32,244133.212,Operating,Dry bottom wall-fired boiler,Pipeline Natural Gas,

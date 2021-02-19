@@ -1,0 +1,960 @@
+---
+title: "EPA-EIA Power Sector Data Crosswalk"
+output:
+  html_document:
+    df_print: paged
+    code_folding: hide
+    theme: readable
+    highlight: espresso
+---
+```{r include = FALSE}
+# Prevent warnings from showing up in markdown output
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = FALSE)
+```
+
+# Background
+
+This R script retrieves the Environmental Protection Agency's (EPA) Clean Air Markets (CAMD) [Power Sector Emissions Data](https://www.epa.gov/airmarkets/power-sector-emissions-data) and EIA's [860 power plant data](https://www.eia.gov/electricity/data/eia860/) about power plant units and maps the EIA data to EPA data. The EPA data are retrieved with the CAMD [FACT API](https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api) and the EIA data are retrieved from the Excel spreadsheets within the ZIP file. You have the option of specifying a different year for EIA data (e.g., the most current year).
+
+The larger data sets from EPA and EIA include information about power plant attributes, emissions, operations, fuel consumption, and electricity generation. This crosswalk relates key identifiers assigned to power plant units to make it easier to connect and use larger EPA and EIA data sets. The crosswalk can also be extended to other government data sets.
+
+Each power plant has a unique facility ID known as an ORIS code (EPA) or plant code (EIA). Steam power plants are made up of boilers (where fuel is combusted to generate steam that moves a turbine) and generators (where kinetic energy from the turbine is converted to electrical energy) to generate electricity. Natural gas-fired power plants are made up of or combustion turbines (where fuel is combusted to turn a turbine) and generators to generate electricity. Combined-cycle power plants also have heat recovery steam generators (where waste heat generates steam that moves a turbine). Boilers, combustion turbines, and generators are interchangeably referred to as units in the two data sets. Because CAMD data is collected for environmental compliance, CAMD considers units to be the combustion units (boilers or combustion turbines). EIA data is collected to track electricity generation, so EIA considers units to be generators. The combustion unit and generator IDs may not be the same, even if they are a part of the same system. In addition, reporting discrepancies may mean that the IDs may not match across the two agencies' databases. This crosswalk attempts to connect these components from both data sets.
+
+# Methodology
+
+## Modify mismatched plant codes
+
+There are some power plants that have a single PLANT_ID/ORIS code in CAMD's data set, but a different or multiple plant codes in EIA's data set. The known manual PLANT_ID matches are pulled in from the `manual_matches.xlsx` file. The EIA_PLANT_ID identifier for these known mismatches are modified and the result is placed in the MOD_EIA_PLANT_ID field (e.g. CAMD PLANT_ID of 330 should match with EIA_PLANT_ID 57901, so the MOD_EIA_PLANT_ID is changed to 57901 to include the match in the crosswalk). Units are matched using the identifiers preceded by `MOD_`
+
+>  Note:
+>  <br>Steps 1 and 2 are performed independently.
+>  <br>Each sub-step(a-d) within Step 1 and 2 is performed sequentially matching on only the unmatched from the previous sub-step(a-d)
+>  <br>To start, each identifier is copied to the field of the same name preceded by `MOD_` and each modification to the original identifier is placed in the corresponding `MOD_` field. This means that if a match occurs without modifying the identifier, the `MOD_` field will be an exact copy of the original identifier.
+>  <br>Joins are performed on the identifiers preceded by `MOD_`
+
+## Step 1: Match CAMD to EIA 3_1_Generator data set (retired and operational generators)
+
+Units are matched on ORIS/modified plant code and generator ID.
+
+- Manual matches and exclusions are pulled in from `manual_matches.xlsx`
+- Step 1a: Units are matched on original unit identifiers
+- Step 1b: Unit identifiers are modified to change to upper case and remove whitespace and special characters.
+- Step 1c: Unit identifiers are modified to change numbers as strings to numeric values.
+- Step 1d: Unit identifiers are modified to remove leading characters if the identifier ends in a number or a number-letter combination (e.g., CT1 becomes 1, CT1A becomes 1A).
+
+## Step 2: Match CAMD to EIA 6_1_EnviroAssoc data set (boilers and generators)
+
+Units are matched on ORIS/modified plant code, unit/boiler ID, and generator ID.
+
+- Manual matches and exclusions are pulled in from `manual_matches.xlsx`
+- Step 2a: Units are matched on original unit identifiers
+- Step 2b: Unit identifiers are modified to change to upper case and remove whitespace and special characters.
+- Step 2c: Unit identifiers are modified to change numbers as strings to numeric values.
+- Step 2d: Unit identifiers are modified to remove leading characters if the identifier ends in a number or a number-letter combination (e.g., CT1 becomes 1, CT1A becomes 1A).
+
+## Step 3: Join data sets from Step 1 and Step 2 to output a set of comprehensive matches that have all CAMD identifiers and all EIA identifiers where they exist. CAMD units that did not match in any step are added to the crosswalk with an indicator that they were unmatched.
+
+The two sets are joined on CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID, EIA_PLANT_ID, and EIA_GENERATOR_ID
+
+> Note:
+> <br>To use this code, you will need an API key. You can request one from the [FACT API overview](https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api#signup).
+
+
+# Processing
+
+## Load required packages
+```{r, echo = TRUE}
+rm(list = ls())
+
+library(tidyverse)
+# tidyr - Help create tidy data
+# stringr - Make working with strings easier (string_glue())
+# readr - Read csv, txt, etc
+# tibble - Wrapper for data.frames that makes things easier (e.g. never converts strings to factors)
+
+library(lubridate) # Make working with dates easier
+
+library(httr) # Perform HTTP requests (in this case used to get data from FACT API)
+
+library(tidyjson) # Work with json objects in a tidy way. Useful for highly nested objects and "ragged" arrays and/or objects (varying lengths by document)
+
+library(readxl) # Read data from xlsx files via read_excel()
+
+library(openxlsx) # Create and write to formatted xlsx documents
+
+library(purrr) # Use of partial and map functions
+```
+
+## Assign key values for data retrieval
+```{r}
+# API key for FACT API
+api_key <- "YOUR_API_KEY"
+eia_860_year <- 2018 # The  EIA data year (available at https://www.eia.gov/electricity/data/eia860/)
+earliest_retirement_year <- 2010 # All units retired before this year are filtered out of the data
+eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{eia_860_year}.zip")
+egrid_data_file <- "https://www.epa.gov/sites/production/files/2020-09/epa-eia_plant_id_crosswalk.xlsx"
+```
+
+## Import CAMD data
+This section imports the unit and generator data from the CAMD FACT API. **A FACT API key is required** and can be obtained easily by signing up at the [FACT API website](https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api#signup).
+```{r, echo = TRUE}
+if (api_key == "YOUR_API_KEY") {
+  stop("You must provide a FACT API key")
+}
+
+response <-
+  GET(str_glue(
+    "https://api.epa.gov/FACT/1.0/facilities?api_key={api_key}"
+  ))
+
+# If something is wrong with the request, fail gracefully
+stop_for_status(response, content(response)$error$message)
+
+camd_plants_json <- content(response, as = "text") %>%
+  enter_object("data") # Top level json object that is an array of all the plants/oris
+
+camd_plants <- camd_plants_json %>%
+  gather_array() %>%
+  spread_all()
+
+camd_combustion_units <- camd_plants %>%
+  enter_object("units") %>%
+  gather_array() %>%
+  spread_all()
+
+# Filter CAMD data to filter out units that started operating after EIA data year
+# Filter out units that retired before earliest_retirement_year value
+camd_combustion_units <- camd_combustion_units %>%
+  filter((status == "OPR" &
+    ymd(as.Date(statusDate)) <= str_glue("{eia_860_year}-12-31")) |
+    (status %in% c("RET", "LTCS") &
+      ymd(as.Date(statusDate)) >= str_glue("{earliest_retirement_year}-01-01")))
+
+# Get the unit and generator IDs
+camd_generators <- camd_combustion_units %>%
+  enter_object("generators") %>%
+  gather_array() %>%
+  spread_all() %>%
+  select(
+    orisCode,
+    unitId,
+    generatorId,
+    nameplateCapacity
+  ) %>%
+  as_tibble()
+
+# Get the primary fuel description for each unit
+camd_fuels <- camd_combustion_units %>%
+  enter_object("fuels") %>%
+  gather_array() %>%
+  spread_all() %>%
+  subset(indicatorDescription == "Primary") %>%
+  select(
+    orisCode,
+    unitId,
+    fuelDesc
+  ) %>%
+  as_tibble()
+
+# Joining unit and generator ID with fuel into a complete units table
+camd_unit <- camd_combustion_units %>%
+  as_tibble() %>%
+  left_join(camd_generators,
+    by = c("orisCode", "unitId")
+  ) %>%
+  left_join(camd_fuels,
+    by = c("orisCode", "unitId")
+  ) %>%
+  select(
+    CAMD_PLANT_ID = "orisCode",
+    CAMD_FACILITY_NAME = "name",
+    CAMD_STATE = state.abbrev,
+    CAMD_LATITUDE = geographicLocation.latitude,
+    CAMD_LONGITUDE = geographicLocation.longitude,
+    CAMD_UNIT_ID = "unitId",
+    MOD_CAMD_UNIT_ID = "unitId",
+    CAMD_FUEL_TYPE = "fuelDesc",
+    CAMD_GENERATOR_ID = "generatorId",
+    MOD_CAMD_GENERATOR_ID = "generatorId",
+    CAMD_NAMEPLATE_CAPACITY = "nameplateCapacity",
+    CAMD_STATUS = "status",
+    CAMD_STATUS_DATE = "statusDate"
+  ) %>%
+  mutate(CAMD_RETIRE_YEAR = ifelse(CAMD_STATUS != "OPR", year(ymd(
+    as.Date(CAMD_STATUS_DATE)
+  )), 0)) %>%
+  arrange(CAMD_PLANT_ID, CAMD_UNIT_ID)
+
+# Clean up
+rm(camd_plants_json)
+rm(camd_plants)
+rm(camd_fuels)
+rm(camd_generators)
+rm(camd_combustion_units)
+rm(response)
+
+camd_unit
+```
+
+## Import EIA data
+This section downloads and imports data from EIA-860 for the year specified above. To manually download the data from EIA, visit the [EIA-860 data](https://www.eia.gov/electricity/data/eia860/). Select and download the latest year's ZIP file on the right-hand-side of the page. The files used in this analysis are "3_1_Generator_Y{year}.xlsx" and "6_1_EnviroAssoc_Y{year}.xlsx", with "2___Plant_Y{year}.xlsx" to get lat/long.
+```{r, echo = TRUE}
+# Import plant, generator, and boiler (EnviroAssoc) data from EIA-860 using data year specified in eia_860_year
+
+download.file(
+  eia_data_file,
+  str_glue("data/eia860{eia_860_year}.zip")
+)
+
+unzip(zipfile = str_glue("data/eia860{eia_860_year}.zip"), exdir = "data")
+
+# Get plant location data
+eia_plant <-
+  read_excel(
+    str_glue("data/2___Plant_Y{eia_860_year}.xlsx"),
+    sheet = "Plant",
+    range = cell_cols("C:K"),
+    skip = 1,
+    trim_ws = TRUE
+  ) %>%
+  select(
+    EIA_PLANT_ID = "Plant Code",
+    EIA_LATITUDE = "Latitude",
+    EIA_LONGITUDE = "Longitude"
+  )
+
+# Get boiler ID
+eia_boiler <-
+  read_excel(
+    str_glue("data/6_1_EnviroAssoc_Y{eia_860_year}.xlsx"),
+    sheet = "Boiler Generator",
+    range = cell_cols("C:F"),
+    skip = 1,
+    trim_ws = TRUE
+  ) %>%
+  select(
+    EIA_PLANT_ID = "Plant Code",
+    EIA_GENERATOR_ID = "Generator ID",
+    EIA_BOILER_ID = "Boiler ID",
+    MOD_EIA_BOILER_ID = "Boiler ID",
+    MOD_EIA_GENERATOR_ID = "Generator ID"
+  ) %>%
+  inner_join(eia_plant, by = c("EIA_PLANT_ID"))
+
+# Create a consolidated list of all units (retired and operating)
+eia_gen_opr <- # Operating units
+  read_excel(
+    str_glue("data/3_1_Generator_Y{eia_860_year}.xlsx"),
+    sheet = "Operable",
+    range = cell_cols("C:AH"),
+    skip = 1,
+    trim_ws = TRUE
+  ) %>%
+  select(-"Planned Retirement Month", -"Planned Retirement Year") %>%
+  mutate("Retirement Year" = 0)
+
+eia_gen_ret <- # Retired units
+  read_excel(
+    str_glue("data/3_1_Generator_Y{eia_860_year}.xlsx"),
+    sheet = "Retired and Canceled",
+    range = cell_cols("C:AH"),
+    skip = 1,
+    trim_ws = TRUE
+  ) %>%
+  select(-"Retirement Month") %>%
+  relocate("Retirement Year", .after = "Energy Source 1") %>%
+  filter(`Retirement Year` >= earliest_retirement_year)
+
+eia_generator <- rbind(eia_gen_opr, eia_gen_ret) %>%
+  select(
+    EIA_PLANT_ID = "Plant Code",
+    EIA_PLANT_NAME = "Plant Name",
+    EIA_STATE = "State",
+    EIA_GENERATOR_ID = "Generator ID",
+    MOD_EIA_GENERATOR_ID = "Generator ID",
+    EIA_UNIT_TYPE = "Prime Mover",
+    EIA_NAMEPLATE_CAPACITY = "Nameplate Capacity (MW)",
+    EIA_FUEL_TYPE = "Energy Source 1",
+    EIA_RETIRE_YEAR = "Retirement Year"
+  ) %>%
+  # Filter out renewable unit types https://www.epa.gov/sites/production/files/2017-01/egrid_code_lookup.xlsx
+  filter(!(EIA_UNIT_TYPE %in% c("BA", "CE", "CP", "FC", "FW", "HA", "HY", "PS", "PV", "WS", "WT")))
+
+
+# Add lat and long
+eia_generator <- eia_generator %>%
+  inner_join(eia_plant, by = c("EIA_PLANT_ID"))
+
+# Clean up
+rm(eia_gen_opr)
+rm(eia_gen_ret)
+rm(eia_plant)
+
+eia_generator
+eia_boiler
+```
+
+## Get manual matches and excluded CAMD units from manual match file
+```{r}
+manual_match_cols <- c("numeric", "text", "text", "numeric", "text", "text")
+
+unit_manual_matches <-
+  read_excel(
+    "manual_matches.xlsx",
+    sheet = "unit_manual_matches",
+    range = cell_cols("A:F"),
+    col_types = manual_match_cols,
+    trim_ws = TRUE
+  )
+unit_manual_excluded <-
+  read_excel(
+    "manual_matches.xlsx",
+    sheet = "unit_manual_excluded",
+    range = cell_cols("A:C"),
+    col_types = head(manual_match_cols, n = 3),
+    trim_ws = TRUE
+  )
+rm(manual_match_cols)
+```
+
+## Modify EIA plant code based on eGRID known mismatch list
+
+In the production of eGRID, CAMD checks whether there are any discrepancies between the ORIS code in CAMD's database and the plant code in EIA's database. A small number of plants do have these mismatches, and they are corrected in this section. This section changes the plant code in EIA's data, placing the changes in the `MOD_EIA_PLANT_ID` column, to match CAMD's ORIS code data, according to Table C-5 of Appendix C in the [eGRID2018 TSD](https://www.epa.gov/egrid/egrid-technical-support-document). A direct download for this table in xlsx format can be found here: [epa-eia_plant_id_crosswalk.xlsx](https://www.epa.gov/sites/production/files/2020-09/epa-eia_plant_id_crosswalk.xlsx).
+The manual match Excel file has a copy of the eGRID epa-eia_plant_id_crosswalk that updates. Any updates to the eGRID file will be reflected in the manual match file.
+```{r,echo = TRUE}
+# Get plant identifier corrections from manual match excel sheet
+egrid_crosswalk_cols <- c("numeric", "text", "numeric", "text")
+
+plant_id_replacements <-
+  read_excel(
+    "manual_matches.xlsx",
+    sheet = "plant_id_manual_matches",
+    range = cell_cols("A:D"),
+    col_types = egrid_crosswalk_cols,
+    trim_ws = TRUE
+  ) %>%
+  select(EIA_PLANT_ID, CAMD_PLANT_ID)
+
+# Turn tibble into named character vector for recode() function
+plant_id_replacements <- plant_id_replacements %>% deframe()
+
+# For plants in the replacement tibble, add the new plant code and flag the record
+# The !!! operator forces-splice the named character vector of plant code corrections
+# meaning that they each become one argument to the recode function instead of one character vector as an arugment
+# i.e. recode(c(a="1", b="2", c="3")) becomes recode(a="1", b="2", c="3")
+eia_generator <- eia_generator %>%
+  mutate(
+    MOD_EIA_PLANT_ID = recode(EIA_PLANT_ID, !!!plant_id_replacements),
+    PLANT_ID_CHANGE_FLAG = ifelse(EIA_PLANT_ID != MOD_EIA_PLANT_ID, 1, 0)
+  )
+
+eia_boiler <- eia_boiler %>%
+  mutate(
+    MOD_EIA_PLANT_ID = recode(EIA_PLANT_ID, !!!plant_id_replacements),
+    PLANT_ID_CHANGE_FLAG = ifelse(EIA_PLANT_ID != MOD_EIA_PLANT_ID, 1, 0)
+  )
+
+rm(plant_id_replacements)
+rm(egrid_crosswalk_cols)
+```
+
+
+
+## Constants used in the following steps
+```{r}
+
+plant_boiler_gen_match <-
+  c(
+    "CAMD_PLANT_ID" = "MOD_EIA_PLANT_ID",
+    "MOD_CAMD_UNIT_ID" = "MOD_EIA_BOILER_ID",
+    "MOD_CAMD_GENERATOR_ID" = "MOD_EIA_GENERATOR_ID"
+  )
+
+plant_boiler_match <-
+  c(
+    "CAMD_PLANT_ID" = "MOD_EIA_PLANT_ID",
+    "MOD_CAMD_UNIT_ID" = "MOD_EIA_BOILER_ID"
+  )
+
+plant_generator_match <-
+  c(
+    "CAMD_PLANT_ID" = "MOD_EIA_PLANT_ID",
+    "MOD_CAMD_GENERATOR_ID" = "MOD_EIA_GENERATOR_ID"
+  )
+```
+
+## Match functions
+
+The match functions for matching units based on plant ID, unit ID/boiler ID, and/or generator ID
+```{r}
+#' Get matches between CAMD and EIA data sets using dplyr::inner_join()
+#'
+#' @param camd_unmatched A data.frame/tibble with unmatched CAMD records to be matched
+#' @param eia_unmatched A data.frame/tibble with unmatched EIA records to be matched
+#' @param by A named character vector with the columns to be matched between CAMD and EIA (fed to dplyr::inner_join())
+#' @param match_type_label A string to label the type of match e.g Step 1d: Modify IDs; remove leading letters
+#'
+#' @return A tibble with new CAMD-EIA matches
+#'
+#' @examples
+#' match_camd_eia_units(
+#'   get_camd_unmatched(camd_unit, camd_eia_gen_crosswalk),
+#'   get_unmatched(eia_generator, camd_eia_gen_crosswalk, by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID")),
+#'   by = c("CAMD_PLANT_ID" = "MOD_EIA_PLANT_ID", "MOD_CAMD_GENERATOR_ID" = "MOD_EIA_GENERATOR_ID"),
+#'   "Step 1a: Exact match"
+#' )
+#'
+#' match_camd_eia_units(
+#'   get_camd_unmatched(camd_unit, camd_eia_gen_crosswalk) %>%
+#'     mutate(across(c(MOD_CAMD_GENERATOR_ID), mod_identifiers_special_char)),
+#'   get_unmatched(eia_generator, camd_eia_gen_crosswalk, by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID")) %>%
+#'     mutate(across(c(MOD_EIA_GENERATOR_ID), mod_identifiers_special_char)),
+#'   by = plant_generator_match,
+#'   "Step 1b: Modify IDs; remove special chars"
+#' )
+match_camd_eia_units <- function(camd_unmatched, eia_unmatched, by, match_type_label) {
+
+  # We need to "enframe" the character vector of match_parameters
+  # in order to easily pull out the "names" and "values" to be used
+  # in restoring columns collapsed by the join
+  match_param_tibble <- enframe(by)
+
+  # Flip the order of "names" and "values" from the original "by" character vector
+  # in order to restore the columns lost by the inner_join
+  restore_cols <-
+    set_names(
+      match_param_tibble$name %>% map(sym),
+      match_param_tibble$value
+    )
+
+  # Inner join the two unmatched data sets
+  camd_eia_matches <- inner_join(camd_unmatched,
+    eia_unmatched,
+    by = by,
+    keep = TRUE
+  ) %>%
+    # Restore the columns that are collapsed after join via restore_cols
+    mutate(!!!restore_cols, MATCH_TYPE = match_type_label)
+
+  return(camd_eia_matches)
+}
+
+#' Get manual matches from specified camd and eia data
+#'
+#' @param manual_matches The data.frame/tibble containing manual matches between camd and eia identifiers
+#' @param camd The data.frame/tibble containing CAMD records
+#' @param eia  The data.frame/tibble containing EIA records
+#'
+#' @return A tibble with manual matches including data from both CAMD and EIA
+#'
+#' @examples
+#' camd_eia_gen_crosswalk <-
+#'   get_manual_matches(
+#'     manual_matches,
+#'     manual_excluded,
+#'     camd_unit,
+#'     eia_generator,
+#'     eia_by
+#'   )
+get_manual_matches <- function(manual_matches, manual_excluded, camd, eia, eia_by) {
+  # We use the EIA/CAMD_PLANT_ID instead of MOD_EIA/CAMD_PLANT_ID because manual matches/unmatched will
+  # use the identifiers from the source and not from the eGRID PLANT_ID crosswalk.
+
+  connection <- inner_join(camd, manual_matches, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))
+
+  if (nrow(connection) < nrow(manual_matches)) {
+    warning(paste(c(
+      "Warning:", str_glue("{nrow(manual_matches) - nrow(connection)} manual_matches do not match with CAMD\n"),
+      paste(format(anti_join(manual_matches, connection, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))), sep = "\n", collapse = "\n")
+    ),
+    sep = "\n", collapse = "\n"
+    ))
+  }
+  # Pull out units that create mismatches
+  unmatched <- manual_excluded %>%
+    inner_join(camd, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID")) %>%
+    mutate(MATCH_TYPE = "Manual CAMD Excluded")
+
+  if (nrow(unmatched) < nrow(manual_excluded)) {
+    warning(paste(c(
+      "", "Warning:", str_glue("{nrow(manual_excluded) - nrow(unmatched)} manual_excluded do not match with CAMD\n"),
+      paste(format(anti_join(manual_excluded, unmatched, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))), .sep = "", collapse = "\n")
+    ), sep = "\n", collapse = "\n"))
+  }
+  all_manual_matches <- inner_join(connection, eia, by = eia_by) %>%
+    mutate(MATCH_TYPE = "Manual Match")
+
+  if (nrow(all_manual_matches) < nrow(manual_matches)) {
+    warning(paste(c(
+      "", "Warning:", str_glue("{nrow(manual_matches) - nrow(all_manual_matches)} manual_matches do not match with EIA\n"),
+      paste(format(anti_join(manual_matches, all_manual_matches, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))), .sep = "", collapse = "\n")
+    ),
+    sep = "\n", collapse = "\n"
+    ))
+  }
+
+  result <- bind_rows(all_manual_matches, unmatched)
+
+  return(result)
+}
+
+#' Get unmatched records from another data.frame or tibble via anti_join
+#'
+#' @param original_data The data.frame/tibble to look for unmatched records
+#' @param prev_matches The data.frame/tibble containing previous matched records from the original data
+#' @param by Optional: A character vector of the columns used to perform the anti_join.
+#'           The set of columns that constitute a unique record in both data.frames/tibbles.
+#'           If omitted, anti_join will use all columns of the same name.
+#'
+#' @return The resulting data.frame/tibble containing unmatched records from the original_data that are not in the prev_matches data.frame/tibble
+#'
+#' @examples
+#' get_unmatched(eia_generator, camd_eia_gen_crosswalk)
+#' get_unmatched(camd_unit, camd_eia_crosswalk, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))
+get_unmatched <- function(original_data, prev_matches, by = NULL) {
+  if (missing(prev_matches) || is.na(prev_matches) || is.null(prev_matches)) {
+    return(original_data)
+  }
+  if (!missing(by) || !is.null(by)) {
+    return(anti_join(original_data, prev_matches, by = by))
+  }
+  anti_join(original_data, prev_matches)
+}
+
+# Create a version of get_unmatched with the 'by' argument partially applied for camd and eia
+get_camd_unmatched <- partial(get_unmatched, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))
+
+get_eia_unmatched <- partial(get_unmatched, by = c("EIA_PLANT_ID", "EIA_BOILER_ID", "EIA_GENERATOR_ID"))
+```
+## Modifier functions
+
+The modifier functions for modifying unit identifiers, such as unit ID/boiler ID and/or generator ID
+```{r}
+
+#' Function to convert all strings in modified generator and combustion unit identifiers to uppercase and remove whitespace and special characters
+#'
+#' @param x A string to modify
+#'
+#' @return A string translated to all uppercase characters with all characters besides alphanumeric removed, including spaces
+#'
+#' @examples
+#' mod_identifiers_special_char("**Alpha Numeric123-")
+#' mod_identifiers_special_char("    a,b,c,1,3,&")
+mod_identifiers_special_char <- function(x) {
+  # str_replace_all uses "\\W" (uppercase) to represent non alphanumeric characters, including whitespace
+  return(str_to_upper(str_replace_all(x, "\\W", "")))
+}
+
+#' Function to convert numbers represented as strings to numeric type
+#'
+#' @param x A string to modify as a numeric type
+#'
+#' @return A number converted from the input string. If not possible to convert to numeric type, return original string
+#'
+#' @examples
+#' mod_to_numeric("0001")
+#' mod_to_numeric("00.12300")
+#' mod_to_numeric("ABC1")
+mod_to_numeric <- function(x) {
+  number <- as.numeric(x)
+  ifelse(!is.na(number), number, x)
+}
+
+
+#' Function to remove leading letters in modified generator and combustion unit identifiers
+#'
+#' @param x A string to modify
+#'
+#' @return A string with leading characters removed leaving only a trailing number or number-letter combo
+#'
+#' @examples
+#' mod_identifiers_leading_letters("GEN1A")
+#' mod_identifiers_leading_letters("HSRVG1")
+#' mod_identifiers_leading_letters("1234AGEN2")
+#' mod_identifiers_leading_letters("123ABC")
+mod_identifiers_leading_letters <- function(x) {
+
+  # str_extract uses "\\d" and "[:alpha:]"" to represent numbers and letters, respectively
+  # Extract numbers and number-letter combinations at the end of the identifier
+  number <- str_extract(x, "\\d+$")
+  number_letter <- str_extract(x, "\\d+[:alpha:]+$")
+  mod_value <- ifelse(!is.na(number), as.numeric(number), if_else(!is.na(number_letter), number_letter, x))
+
+  return(mod_value)
+}
+```
+
+## Match Sub-steps
+
+These steps are performed in sequential order during Steps 1 and 2, the matching process between CAMD and each of the EIA 3_1_Generator (generator) and 6_1_EnviroAssoc (boiler) files.
+
+### Sub-step a - Exact match on all unit identifiers
+In this step, we look for direct matches on the EPA and EIA unit identifiers.
+
+### Sub-step b - Modify identifiers to change to uppercase and remove whitespace and special characters
+In this step, we modify the EPA and EIA unit identifiers to adjust all alpha characters to uppercase, remove whitespace, and remove special characters
+Examples of these modifications include:
+
+* un14 -> UN14
+* CT 2A -> CT2A
+* CT-1 -> CT1
+
+### Sub-step c - Modify identifiers to convert numbers in strings to numeric values
+In this step, we modify the EPA and EIA unit identifiers to convert all numbers presented as strings to numeric values. This also eliminates leading zeros.
+Examples of these modifications include:
+
+* 002 -> 2
+* "2" -> 2
+
+### Sub-step d - Modify identifiers to eliminate leading alpha characters
+In this step, we modify the EPA and EIA unit identifiers to remove all alpha (letter) characters at the start of the identifier if the identifier ends in a number or number-letter combination.
+Examples of these modifications include:
+
+* CT1A -> 1A
+* SGT1 -> 1
+* No 5 -> 5
+
+## Steps 1, 2 and 3:
+
+Look for matches on the modified EPA and EIA unit identifiers between CAMD and EIA 3_1_Generator (generators) EIA 6_1_EnviroAssoc (boilers) separately. After both matches are complete between CAMD and each of the EIA data sets, we join the matches to have a result with matches between:
+
+CAMD_PLANT_ID     = EIA_PLANT_ID
+
+CAMD_UNIT_ID      = EIA_BOILER_ID
+
+CAMD_GENERATOR_ID = EIA_GENERATOR_ID
+
+
+## Step 1: Match CAMD to EIA 3_1_Generator data set (retired and operational generators)
+```{r}
+generator_step_string <- "3_1_Generator (generators) match on plant and gen IDs  Step 1"
+
+camd_eia_gen_crosswalk <-
+  get_manual_matches(
+    unit_manual_matches,
+    unit_manual_excluded,
+    camd_unit,
+    eia_generator,
+    eia_by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID")
+  )
+
+camd_eia_gen_crosswalk <- camd_eia_gen_crosswalk %>%
+  bind_rows(
+    match_camd_eia_units(
+      get_camd_unmatched(camd_unit, camd_eia_gen_crosswalk),
+      get_unmatched(eia_generator, camd_eia_gen_crosswalk, by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID")),
+      by = plant_generator_match,
+      str_glue("{generator_step_string}a: Exact match")
+    )
+  )
+
+camd_eia_gen_crosswalk <- camd_eia_gen_crosswalk %>%
+  bind_rows(
+    match_camd_eia_units(
+      get_camd_unmatched(camd_unit, camd_eia_gen_crosswalk) %>%
+        mutate(across(c(MOD_CAMD_GENERATOR_ID), mod_identifiers_special_char)),
+      get_unmatched(eia_generator, camd_eia_gen_crosswalk, by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID")) %>%
+        mutate(across(c(MOD_EIA_GENERATOR_ID), mod_identifiers_special_char)),
+      by = plant_generator_match,
+      str_glue("{generator_step_string}b: Modify IDs; remove special chars")
+    )
+  )
+
+camd_eia_gen_crosswalk <- camd_eia_gen_crosswalk %>%
+  bind_rows(
+    match_camd_eia_units(
+      get_camd_unmatched(camd_unit, camd_eia_gen_crosswalk) %>%
+        mutate(across(c(MOD_CAMD_GENERATOR_ID), mod_to_numeric)),
+      get_unmatched(eia_generator, camd_eia_gen_crosswalk, by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID")) %>%
+        mutate(across(c(MOD_EIA_GENERATOR_ID), mod_to_numeric)),
+      by = plant_generator_match,
+      str_glue("{generator_step_string}c: Modify IDs; convert to numeric")
+    )
+  )
+
+camd_eia_gen_crosswalk <- camd_eia_gen_crosswalk %>%
+  bind_rows(
+    match_camd_eia_units(
+      get_camd_unmatched(camd_unit, camd_eia_gen_crosswalk) %>%
+        mutate(across(c(MOD_CAMD_GENERATOR_ID), mod_identifiers_leading_letters)),
+      get_unmatched(eia_generator, camd_eia_gen_crosswalk, by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID")) %>%
+        mutate(across(c(MOD_EIA_GENERATOR_ID), mod_identifiers_leading_letters)),
+      by = plant_generator_match,
+      str_glue("{generator_step_string}d: Modify IDs; remove leading letters")
+    )
+  )
+
+generator_match_summary <- camd_eia_gen_crosswalk %>%
+  group_by(MATCH_TYPE) %>%
+  mutate(MATCH_TYPE = as.character(MATCH_TYPE)) %>%
+  summarize(
+    MATCH_COUNT = n(),
+    DUPLICATE_COUNT = MATCH_COUNT - n_distinct(CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID)
+  ) %>%
+  mutate(CUMULATIVE_COUNT = cumsum(MATCH_COUNT), .after = MATCH_COUNT) %>%
+  mutate(
+    CUMULATIVE_DUPLICATES = cumsum(DUPLICATE_COUNT),
+    UNMATCHED = nrow(camd_unit) - CUMULATIVE_COUNT + CUMULATIVE_DUPLICATES
+  )
+generator_match_summary
+```
+
+## Step 2: Match CAMD to EIA 6_1_EnviroAssoc (boilers and generators) data set
+```{r}
+
+boiler_step_string <- "6_1_EnviroAssoc (boilers and generators) match on plant, boiler, and gen IDs Step 2"
+
+camd_eia_boiler_crosswalk <-
+  get_manual_matches(
+    # Because we are getting manual matches from the boiler file, we
+    # will exclude manual matches without a boiler
+    unit_manual_matches %>% filter(!is.na(EIA_BOILER_ID)),
+    unit_manual_excluded,
+    camd_unit,
+    eia_boiler,
+    eia_by = c("EIA_PLANT_ID", "EIA_BOILER_ID", "EIA_GENERATOR_ID")
+  )
+
+camd_eia_boiler_crosswalk <- camd_eia_boiler_crosswalk %>%
+  bind_rows(
+    match_camd_eia_units(
+      get_camd_unmatched(camd_unit, camd_eia_boiler_crosswalk),
+      get_unmatched(eia_boiler, camd_eia_boiler_crosswalk, by = c("EIA_PLANT_ID", "EIA_BOILER_ID", "EIA_GENERATOR_ID")),
+      by = plant_boiler_gen_match,
+      str_glue("{boiler_step_string}a: Exact match")
+    )
+  )
+
+camd_eia_boiler_crosswalk <- camd_eia_boiler_crosswalk %>%
+  bind_rows(
+    match_camd_eia_units(
+      get_camd_unmatched(camd_unit, camd_eia_boiler_crosswalk) %>%
+        mutate(across(c(MOD_CAMD_UNIT_ID, MOD_CAMD_GENERATOR_ID), mod_identifiers_special_char)),
+      get_unmatched(eia_boiler, camd_eia_boiler_crosswalk, by = c("EIA_PLANT_ID", "EIA_BOILER_ID", "EIA_GENERATOR_ID")) %>%
+        mutate(across(c(MOD_EIA_BOILER_ID, MOD_EIA_GENERATOR_ID), mod_identifiers_special_char)),
+      by = plant_boiler_gen_match,
+      str_glue("{boiler_step_string}b: Modify IDs; remove special chars")
+    )
+  )
+
+camd_eia_boiler_crosswalk <- camd_eia_boiler_crosswalk %>%
+  bind_rows(
+    match_camd_eia_units(
+      get_camd_unmatched(camd_unit, camd_eia_boiler_crosswalk) %>%
+        mutate(across(c(MOD_CAMD_UNIT_ID, MOD_CAMD_GENERATOR_ID), mod_to_numeric)),
+      get_unmatched(eia_boiler, camd_eia_boiler_crosswalk, by = c("EIA_PLANT_ID", "EIA_BOILER_ID", "EIA_GENERATOR_ID")) %>%
+        mutate(across(c(MOD_EIA_BOILER_ID, MOD_EIA_GENERATOR_ID), mod_to_numeric)),
+      by = plant_boiler_gen_match,
+      str_glue("{boiler_step_string}c: Modify IDs; convert to numeric")
+    )
+  )
+
+camd_eia_boiler_crosswalk <- camd_eia_boiler_crosswalk %>%
+  bind_rows(
+    match_camd_eia_units(
+      get_camd_unmatched(camd_unit, camd_eia_boiler_crosswalk) %>%
+        mutate(across(c(MOD_CAMD_UNIT_ID, MOD_CAMD_GENERATOR_ID), mod_identifiers_leading_letters)),
+      get_unmatched(eia_boiler, camd_eia_boiler_crosswalk, by = c("EIA_PLANT_ID", "EIA_BOILER_ID", "EIA_GENERATOR_ID")) %>%
+        mutate(across(c(MOD_EIA_BOILER_ID, MOD_EIA_GENERATOR_ID), mod_identifiers_leading_letters)),
+      by = plant_boiler_gen_match,
+      str_glue("{boiler_step_string}d: Modify IDs; remove leading letters")
+    )
+  )
+
+boiler_match_summary <- camd_eia_boiler_crosswalk %>%
+  group_by(MATCH_TYPE) %>%
+  mutate(MATCH_TYPE = as.character(MATCH_TYPE)) %>%
+  summarize(
+    MATCH_COUNT = n(),
+    DUPLICATE_COUNT = MATCH_COUNT - n_distinct(CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID)
+  ) %>%
+  mutate(CUMULATIVE_COUNT = cumsum(MATCH_COUNT), .after = MATCH_COUNT) %>%
+  mutate(
+    CUMULATIVE_DUPLICATES = cumsum(DUPLICATE_COUNT),
+    UNMATCHED = nrow(camd_unit) - CUMULATIVE_COUNT + CUMULATIVE_DUPLICATES
+  )
+boiler_match_summary
+```
+
+## Step 3: Join data sets from Step 2 and Step 3 to have a set of comprehensive matches that have all CAMD identifiers and all EIA identifiers where they exist. CAMD units that did not match in any step are added to the crosswalk with an indicator that they were unmatched.
+```{r}
+camd_eia_crosswalk <- camd_eia_gen_crosswalk %>%
+  # We needed the manual matches/unmatched in the gen/boiler crosswalks to keep them out of the process,
+  # but now we need to pull them out to join the two crosswalks, since their inclusion creates duplicates in this
+  # left_join.
+  filter(str_detect(MATCH_TYPE, "Manual", negate = TRUE)) %>%
+  # Need to remove the boiler_id from the generator matches, since it was added with the manual matches.
+  # Only the manual matches have a boiler ID at this point.
+  select(-EIA_BOILER_ID) %>%
+  left_join(
+    camd_eia_boiler_crosswalk %>%
+      filter(str_detect(MATCH_TYPE, "Manual", negate = TRUE)) %>%
+      select(
+        CAMD_PLANT_ID,
+        CAMD_UNIT_ID,
+        CAMD_GENERATOR_ID,
+        EIA_PLANT_ID,
+        EIA_BOILER_ID,
+        MOD_EIA_BOILER_ID,
+        EIA_GENERATOR_ID,
+        MOD_EIA_GENERATOR_ID,
+        MATCH_TYPE
+      ),
+    by = c(
+      "CAMD_PLANT_ID",
+      "CAMD_UNIT_ID",
+      "CAMD_GENERATOR_ID",
+      "EIA_PLANT_ID",
+      "EIA_GENERATOR_ID"
+    ),
+    suffix = c("_GEN", "_BOILER")
+  ) %>%
+  # And now we add the manual matches/unmatched back to the crosswalk
+  bind_rows(
+    get_manual_matches(
+      unit_manual_matches,
+      unit_manual_excluded,
+      camd_unit,
+      # The generator file is sufficient here, because we just need the facility info
+      # and this will pull in all the manual matches, since generator ID is required in the manual matches file.
+      eia_generator,
+      eia_by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID")
+    ) %>%
+      # Set the MATCH_TYPE_GEN/BOILER to the MATCH_TYPE from get_manual_matches
+      mutate(
+        MATCH_TYPE_GEN = MATCH_TYPE,
+        MATCH_TYPE_BOILER = MATCH_TYPE,
+      )
+  ) %>%
+  mutate(
+    SEQUENCE_NUMBER = row_number()
+  ) %>%
+  select(
+    SEQUENCE_NUMBER,
+    CAMD_STATE,
+    CAMD_FACILITY_NAME,
+    CAMD_PLANT_ID,
+    CAMD_UNIT_ID,
+    CAMD_GENERATOR_ID,
+    CAMD_NAMEPLATE_CAPACITY,
+    CAMD_FUEL_TYPE,
+    CAMD_LATITUDE,
+    CAMD_LONGITUDE,
+    CAMD_STATUS,
+    CAMD_STATUS_DATE,
+    CAMD_RETIRE_YEAR,
+    MOD_CAMD_UNIT_ID,
+    MOD_CAMD_GENERATOR_ID,
+    EIA_STATE,
+    EIA_PLANT_NAME,
+    EIA_PLANT_ID,
+    EIA_GENERATOR_ID,
+    EIA_NAMEPLATE_CAPACITY,
+    EIA_BOILER_ID,
+    EIA_UNIT_TYPE,
+    EIA_FUEL_TYPE,
+    EIA_LATITUDE,
+    EIA_LONGITUDE,
+    EIA_RETIRE_YEAR,
+    PLANT_ID_CHANGE_FLAG,
+    MOD_EIA_PLANT_ID,
+    MOD_EIA_BOILER_ID,
+    MOD_EIA_GENERATOR_ID_BOILER,
+    MOD_EIA_GENERATOR_ID_GEN,
+    MATCH_TYPE_GEN,
+    MATCH_TYPE_BOILER
+  ) %>%
+  arrange(CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID)
+
+camd_eia_crosswalk
+```
+
+
+
+## Get unmatched after all Steps
+```{r}
+camd_unmatched <- get_camd_unmatched(camd_unit, camd_eia_crosswalk) %>%
+  arrange(CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID)
+eia_gen_unmatched <- get_unmatched(eia_generator, camd_eia_crosswalk, by = c("EIA_PLANT_ID", "EIA_GENERATOR_ID"))
+eia_boiler_unmatched <- get_unmatched(eia_boiler, camd_eia_crosswalk, by = c("EIA_PLANT_ID", "EIA_BOILER_ID", "EIA_GENERATOR_ID"))
+
+camd_unmatched <- camd_unmatched %>%
+  mutate(
+    MATCH_TYPE_GEN = "CAMD Unmatched",
+    MATCH_TYPE_BOILER = "CAMD Unmatched"
+  )
+
+# Bind the unmatched CAMD units to the result
+camd_eia_crosswalk <- camd_eia_crosswalk %>%
+  bind_rows(camd_unmatched) %>%
+  arrange(CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID)
+
+camd_unmatched
+eia_gen_unmatched
+eia_boiler_unmatched
+```
+
+### Match Summary
+
+CAMD_DISTINCT/DUPLICATES are found according to unique combinations of CAMD plant, unit, and generator identifiers. Duplicates can either be introduced from the automated crosswalk operations or from manual matches. Duplicates can also occur in the rare cases where CAMD has fewer identifiers for the same unit/generator than EIA (e.g. CAMD_PLANT_ID = 52151, CAMD_UNIT_ID = 001, EIA_PLANT_ID = 52151, EIA_BOILER_ID = PB1,RF1,PB2,RF2).
+
+```{r, echo = TRUE}
+# Create table of counts of matches for each step
+crosswalk_summary_table <-
+  camd_eia_crosswalk %>%
+  filter(str_detect(MATCH_TYPE_GEN, "Unmatched|Excluded", negate = T) | str_detect(MATCH_TYPE_BOILER, "Unmatched|Excluded", negate = T)) %>%
+  summarize(
+    CAMD_MATCHED = n(),
+    CAMD_DISTINCT = n_distinct(CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID),
+    CAMD_DUPLICATE = n() - CAMD_DISTINCT
+  ) %>%
+  mutate(
+    CAMD_UNMATCHED = camd_eia_crosswalk %>%
+      filter(str_detect(MATCH_TYPE_GEN, "Unmatched", negate = F) | str_detect(MATCH_TYPE_BOILER, "Unmatched", negate = F)) %>%
+      nrow(),
+    CAMD_EXCLUDED = camd_eia_crosswalk %>%
+      filter(str_detect(MATCH_TYPE_GEN, "Excluded", negate = F) | str_detect(MATCH_TYPE_BOILER, "Excluded", negate = F)) %>%
+      nrow()
+  )
+
+crosswalk_summary_table
+```
+
+## Crosswalk output
+```{r,echo = TRUE}
+# Create/modify xlsx workbook and worksheet to add text format to cells, preventing Excel from
+# changing some GENIDs and UNIT_IDs to dates and other automatic formatting issues
+if (!file.exists("epa_eia_crosswalk.xlsx")) {
+  wb <- createWorkbook()
+} else {
+  wb <- loadWorkbook("epa_eia_crosswalk.xlsx")
+  # must remove worksheet to replace the data
+  removeWorksheet(wb, "epa_eia_crosswalk")
+}
+
+addWorksheet(wb, "epa_eia_crosswalk")
+
+# The numFmt = TEXT specifies text format for the cells,
+# thus avoiding the automatic conversion to dates
+# (e.g. 6-1 and 1-1 wont be converted to Jun-1, Jan-1) when "GENERAL" format is used
+textstyle <- createStyle(fontName = "Calibri", fontSize = 11, numFmt = "TEXT")
+
+writeDataTable(wb = wb, sheet = "epa_eia_crosswalk", x = camd_eia_crosswalk)
+
+addStyle(
+  wb = wb, sheet = "epa_eia_crosswalk",
+  rows = 1:nrow(camd_eia_crosswalk), cols = 1:ncol(camd_eia_crosswalk),
+  style = textstyle, gridExpand = TRUE
+)
+
+saveWorkbook(wb, "epa_eia_crosswalk.xlsx", overwrite = TRUE)
+
+# For a more accessible document, output csv, but if used in Excel, some GENIDs will be
+# interpreted as dates and leading zeros will be removed causing issues.
+write_excel_csv(camd_eia_crosswalk,
+  "epa_eia_crosswalk.csv",
+  col_names = TRUE,
+  na = ""
+)
+camd_eia_crosswalk
+```
