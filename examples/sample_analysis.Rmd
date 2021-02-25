@@ -66,7 +66,7 @@ eia_data <- read_excel(
   )
 
 #import crosswalk
-crosswalk <- read_csv("sample_data/camd_eia_crosswalk.csv") %>%
+crosswalk <- read_csv("../epa_eia_crosswalk.csv") %>%
   select(
     CAMD_PLANT_ID,
     CAMD_UNIT_ID,
