@@ -48,7 +48,7 @@ For more information on EIA's electricity data, see <https://www.eia.gov/electri
 
 ### How do I cite the crosswalk data?
 
-Huetteman, Justine; Tafoya, Johnathan; Johnson, Travis; and Schreifels, Jeremy. 2021. EPA-EIA Power Sector Data Crosswalk.
+Huetteman, Justine; Tafoya, Johnathan; Johnson, Travis; and Schreifels, Jeremy. 2021. [EPA-EIA Power Sector Data Crosswalk](https://www.epa.gov/airmarkets/power-sector-data-crosswalk).
 
 ## Methodology
 
@@ -94,7 +94,7 @@ For more information on the [EIA-860](https://jira.epa.gov/browse/EIA-860), see 
 
 ## Output
 
-The resulting crosswalk includes an xlsx spreadsheet (`camd_eia_crosswalk.xlsx`) and csv file (`camd_eia_crosswalk.csv`), which list all boilers and generators in CAMD's database with their corresponding EIA boiler and generator if they have a match. Unmatched CAMD units are included with a "CAMD Unmatched" label in the "MATCH_TYPE" columns. Generators listed in EIA data that are not matched to CAMD data are omitted. The fields "MATCH_TYPE_GEN" and "MATCH_TYPE_BOILER" indicate how the generators and boilers were matched. The fields included in the final crosswalk are listed and described in the table below.
+The resulting crosswalk includes an xlsx spreadsheet (`epa_eia_crosswalk.xlsx`) and csv file (`epa_eia_crosswalk.csv`), which list all boilers and generators in CAMD's database with their corresponding EIA boiler and generator if they have a match. Unmatched CAMD units are included with a "CAMD Unmatched" label in the "MATCH_TYPE" columns. Generators listed in EIA data that are not matched to CAMD data are omitted. The fields "MATCH_TYPE_GEN" and "MATCH_TYPE_BOILER" indicate how the generators and boilers were matched. The fields included in the final crosswalk are listed and described in the table below.
 
 | **Column Name**             | **Description**                                                                                                                                                                                                                                                                                                   |
 |-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
