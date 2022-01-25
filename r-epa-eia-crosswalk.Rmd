@@ -59,7 +59,6 @@ The two sets are joined on CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID, EIA_P
 > Note:
 > <br>To use this code, you will need an API key. You can request one from the [FACT API overview](https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api#signup).
 
-
 # Processing
 
 ## Load required packages
@@ -78,6 +77,8 @@ library(httr) # Perform HTTP requests (in this case used to get data from FACT A
 
 library(tidyjson) # Work with json objects in a tidy way. Useful for highly nested objects and "ragged" arrays and/or objects (varying lengths by document)
 
+library(jsonlite)
+
 library(readxl) # Read data from xlsx files via read_excel()
 
 library(openxlsx) # Create and write to formatted xlsx documents
@@ -93,6 +94,17 @@ eia_860_year <- 2018 # The  EIA data year (available at https://www.eia.gov/elec
 earliest_retirement_year <- 2010 # All units retired before this year are filtered out of the data
 eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{eia_860_year}.zip")
 egrid_data_file <- "https://www.epa.gov/sites/production/files/2020-09/epa-eia_plant_id_crosswalk.xlsx"
+```
+
+## Include Additional Datasets
+```{r}
+# include FRS IDs
+# Note: adding FRS IDs may add several minutes of processing time to the code due to data retrieval.
+include_FRS <- FALSE
+
+# include NEEDS IDs
+include_NEEDS <- TRUE
+
 ```
 
 ## Import CAMD data
@@ -918,6 +930,111 @@ crosswalk_summary_table <-
   )
 
 crosswalk_summary_table
+```
+
+## Add Optional Datasets
+```{r, echo = TRUE}
+# add FRS IDs to crosswalk output
+# set to run/not run by changing TRUE/FALSE at the beginning of the code
+# WARNING: could take several minutes to run due to data retrieval
+
+if(!include_FRS) {
+  print("No FRS IDs added")
+} else {
+  get_frs_id <- function(camd_eia_crosswalk) {
+    systems <- c("EIA-860", "CAMDBS", "EGRID")
+    for (sys in systems) {
+      id <- get_frs_id_sys(camd_eia_crosswalk, sys)
+      if (!is.na(id)) {
+        return(id)
+      }
+    }
+    return(NA)
+  }
+  get_frs_id_sys <- function(camd_eia_crosswalk, sys) {
+    frs_endpoint <-
+      str_glue(
+        "https://ofmpub.epa.gov/enviro/frs_rest_services.get_facilities?pgm_sys_acrnm={sys}&pgm_sys_id={oris}&output=JSON"
+      )
+    response <- GET(frs_endpoint)
+    text_json <-
+      str_replace_all(suppressMessages(content(response, as = "text")), "[\\r\\n\\t]+", "")
+    raw_json <- fromJSON(text_json)
+    if (length(pluck(raw_json, 1, "FRSFacility")) == 0) {
+      return(NA)
+    }
+    frs_id <- pluck(raw_json, 1, "FRSFacility", "RegistryId")
+
+    return(as.numeric(frs_id))
+  }
+
+  camd_eia_crosswalk <- add_column(FRS_ID = camd_eia_crosswalk$CAMD_PLANT_ID %>% map(get_frs_id)) %>%
+    rowwise() %>%
+    mutate(FRS_ID = paste(FRS_ID, collapse = ',')) %>%
+    ungroup()
+  
+  camd_eia_crosswalk <- camd_eia_crosswalk %>%
+    relocate(FRS_ID, .before = MATCH_TYPE_GEN)
+}
+
+```
+
+```{r, echo = TRUE}
+# add NEEDS IDs to crosswalk output
+# set to run/not run by changing TRUE/FALSE at the beginning of the code
+
+if(!include_NEEDS) {
+  print("No NEEDS IDs added")
+} else {
+  wd <- getwd()
+  
+  needs <-
+    read_excel(
+      str_glue("{wd}/data/needs_v6_november_2018_reference_case_0.xlsx"),
+      sheet = "NEEDS v6_Active",
+      range = cell_cols("B:E")
+    ) %>%
+    select(
+      NEEDS_UNIQUE_ID = UniqueID_Final,
+      NEEDS_PLANT_ID = `ORIS Plant Code`,
+      NEEDS_UNIT_ID = `Unit ID`,
+      NEEDS_TYPE = `Boiler/Generator/Committed Unit`
+    )
+  
+  needs_boilers <- needs %>%
+    filter(NEEDS_TYPE == "B") %>%
+    select(-NEEDS_TYPE)
+  
+  needs_generators <- needs %>%
+    filter(NEEDS_TYPE == "G") %>%
+    mutate(NEEDS_GENERATOR_ID = NEEDS_UNIT_ID) %>%
+    select(-NEEDS_TYPE, -NEEDS_UNIT_ID)
+  
+  camd_eia_crosswalk <-
+    camd_eia_crosswalk %>% left_join(
+      needs_generators,
+      by = c("EIA_PLANT_ID" = "NEEDS_PLANT_ID", "EIA_GENERATOR_ID" = "NEEDS_GENERATOR_ID")
+    ) %>%
+    mutate(NEEDS_UNIQUE_G_ID = NEEDS_UNIQUE_ID) %>%
+    select(-NEEDS_UNIQUE_ID)
+  
+  camd_eia_crosswalk <-
+    camd_eia_crosswalk %>% left_join(
+      needs_boilers,
+      by = c("EIA_PLANT_ID" = "NEEDS_PLANT_ID", "EIA_BOILER_ID" = "NEEDS_UNIT_ID")
+    ) %>%
+    mutate(NEEDS_UNIQUE_B_ID = NEEDS_UNIQUE_ID) %>%
+    select(-NEEDS_UNIQUE_ID)
+  
+  camd_eia_crosswalk <-
+    camd_eia_crosswalk %>%
+    mutate(NEEDS_UNIQUE_ID = if_else(is.na(NEEDS_UNIQUE_B_ID), NEEDS_UNIQUE_G_ID, NEEDS_UNIQUE_B_ID)) %>%
+    select(-NEEDS_UNIQUE_B_ID, -NEEDS_UNIQUE_G_ID)
+  
+  camd_eia_crosswalk <- camd_eia_crosswalk %>%
+    relocate(NEEDS_UNIQUE_ID, .before = MATCH_TYPE_GEN)
+}
+
 ```
 
 ## Crosswalk output
