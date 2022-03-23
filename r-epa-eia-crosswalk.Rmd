@@ -826,11 +826,7 @@ camd_eia_crosswalk <- camd_eia_gen_crosswalk %>%
         MATCH_TYPE_BOILER = MATCH_TYPE,
       )
   ) %>%
-  mutate(
-    SEQUENCE_NUMBER = row_number()
-  ) %>%
   select(
-    SEQUENCE_NUMBER,
     CAMD_STATE,
     CAMD_FACILITY_NAME,
     CAMD_PLANT_ID,
@@ -887,7 +883,11 @@ camd_unmatched <- camd_unmatched %>%
 # Bind the unmatched CAMD units to the result
 camd_eia_crosswalk <- camd_eia_crosswalk %>%
   bind_rows(camd_unmatched) %>%
-  arrange(CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID)
+  arrange(CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID) %>%
+  mutate(
+    SEQUENCE_NUMBER = row_number(),
+    .before= CAMD_STATE
+  )
 
 camd_unmatched
 eia_gen_unmatched
