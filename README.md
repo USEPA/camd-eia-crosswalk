@@ -4,17 +4,23 @@ A data crosswalk to integrate U.S. power sector emission and operation data from
 
 > Notice: This is a work in progress. EPA's Clean Air Markets Division (CAMD) continues to refine its methodology and quality assurance procedures and will provide information on updates as necessary.
 
+> Update (v0.3): As of October 2022, CAMD has added manual matches through a unit-by-unit investigation as well as new datasets, as described below. CAMD has also fixed an issue with the sequence numbers (a column added to maintain the order of the units in Excel), resulting in changes from v0.2.
+
 ## Background
 
 ------------------------------------------------------------------------
 
 CAMD and EIA provide two of the most comprehensive and commonly used data sets about the electric power sector. These two data sets include information on emissions, electricity generation, fuel use, operations, and attributes of power plants across the United States. Many researchers and data users find useful information in both data sets. However, key differences in the purpose and manner of data collection by these agencies contribute to difficulties in merging the two data sets. In providing this crosswalk, which relates key identifiers assigned to power plants and units used by both agencies, CAMD is hoping to make it easier to integrate both data sets.
 
+> Update (v0.3): In addition, CAMD is providing code to facilitate matching to two other relevant EPA datasets: [Facility Registry Service (FRS)](https://www.epa.gov/frs) identifiers and [National Electric Energy Data System (NEEDS)](https://www.epa.gov/power-sector-modeling/national-electric-energy-data-system-needs-v6) identifiers. Some additional information about these two datasets is provided below.
+
 The crosswalk is available as a spreadsheet (xlsx) and delimited text file (csv) for those who are just looking to integrate the two data sets. The R script for producing the crosswalk from the two data sets is also available for those interested in how it was made or adapting it. Please see "Contributing to the Crosswalk" for more information on how to improve it.
 
 ### What facilities are included in each data set?
 
 Generally speaking, CAMD collects the [Power Sector Emissions Data](https://www.epa.gov/airmarkets/power-sector-emissions-data) from fossil fuel-fired electric generating units (EGUs) over 25 MW in nameplate capacity. EIA collects data on all EGUs (including nuclear and renewables) that are located at a plant that is over 1 MW in nameplate capacity and connected to the electricity grid.
+
+> Update (v0.3): FRS assigns facility identifiers to facilities that submit data to EPA under any program, including EGUs. NEEDS combines the list of EGUs from both the Power Sector Emissions Data and EIA datasets, while assigning its own identifiers to those EGUs.
 
 ### How are these data collected?
 
@@ -27,6 +33,8 @@ CAMD is empowered to collect the [Power Sector Emissions Data](https://www.epa.g
 ### What is the temporal resolution of each data set?
 
 CAMD collects hourly emissions and operation data at the combustion unit (e.g., boiler) level. Power plants submit these data to EPA every calendar quarter. Generally, EIA provides monthly and annual data at the power plant and/or generating unit levels.
+
+> Update (v0.3): NEEDS contains data used for modeling future power sector outcomes in the [Integrated Planning Model (IPM)](https://www.epa.gov/power-sector-modeling). FRS IDs are assigned to facilities that are a part of at least one of several national and state information/data/regulatory programs. FRS IDs associated with EGUs are unlikely to change, as their underlying Plant IDs are unlikely to change. New or retired EGUs would be added or removed from the FRS in accordance with updates to the CAMD or EIA databases.
 
 ### What is the lowest level of spatial aggregation for each data set?
 
@@ -48,7 +56,7 @@ For more information on EIA's electricity data, see <https://www.eia.gov/electri
 
 ### How do I cite the crosswalk data?
 
-Huetteman, Justine; Tafoya, Johnathan; Johnson, Travis; and Schreifels, Jeremy. 2021. EPA-EIA Power Sector Data Crosswalk. Accessible at www.epa.gov/airmarkets/power_sector_data_crosswalk.
+Huetteman, Justine; Tafoya, Johnathan; Johnson, Travis; and Schreifels, Jeremy. 2022. EPA-EIA Power Sector Data Crosswalk. Accessible at www.epa.gov/airmarkets/power_sector_data_crosswalk.
 
 ## Methodology
 
@@ -87,6 +95,12 @@ Within each matching step, there are sub-steps that perform the exact and "fuzzy
 In rare instances, the Plant IDs do not match between CAMD and EIA's databases. These discrepancies were discovered through the production of [eGRID](https://www.epa.gov/egrid) and are regularly tracked and updated with new eGRID releases. In the crosswalk R script, these discrepancies are accounted for before any matching occurs–EIA's plant ID is modified ("MOD_EIA_PLANT_ID") to match CAMD's plant ID and includes a field indicating that the plant ID has been changed ("PLANT_ID_CHANGE_FLAG").
 
 Other discrepancies or missing data may exist and are manually investigated and added to the `manual_matches.xlsx`. In the R script, these matches are done first. This helps remove duplicates and improve accuracy. If other manual matches are found, they will be added to this file, and anyone can create a pull request adding matches and a CAMD staff member will review the pull request to incorporate the new matches.
+
+> Update (v0.3): Once the matching steps have been made between CAMD and EIA data, steps to add FRS IDs and NEEDS IDs will run in the code. These steps will run only if the user has set the options for additional datasets to be included towards the beginning of the code (i.e., “include_FRS” and/or “include_NEEDS” set to TRUE).
+
+> To add FRS IDs, the code calls the [FRS ID REST API](https://www.epa.gov/frs/frs-rest-services). These IDs are joined to CAMD data via CAMD_PLANT_ID. These IDs are at the facility level, so all subcomponents (generators and boilers) at one facility will be assigned the same FRS ID.
+
+> To add NEEDS IDs, the code imports the NEEDS flat file from [November 2018](https://www.epa.gov/power-sector-modeling/national-electric-energy-data-system-needs-v6), which is available in the data file in this repo. NEEDS IDs (“NEEDS_UNIQUE_ID”) are a concatenated version of the EIA Plant ID, EIA Generator/Boiler ID, and a letter indicating whether the unit is a boiler (“B”) or a generator (“G”). Generators from NEEDS are matched on EIA_PLANT_ID and EIA_GENERATOR_ID. If the unit has an associated EIA_BOILER_ID, boilers from NEEDS are matched on EIA_PLANT_ID and EIA_BOILER_ID.
 
 For more information on CAMD's FACT API and to sign up for an API key, see <https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api#/>.
 
