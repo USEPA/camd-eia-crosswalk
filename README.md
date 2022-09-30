@@ -146,6 +146,11 @@ The resulting crosswalk includes an xlsx spreadsheet (`epa_eia_crosswalk.xlsx`) 
 | MATCH_TYPE_GEN              | The type of match made during Step 1, matching CAMD generators to EIA generators on CAMD and EIA plant and generator IDs. Any applied modifier sub-steps are also indicated in this field.                                                                                                                        |
 | MATCH_TYPE_BOILER           | The type of match made during Step 2, matching CAMD units and generators to EIA boilers and generators on CAMD and EIA plant, unit/boiler, and generator IDs. Any applied modifier sub-steps are also indicated in this field.                                                                                    |
 
+> Update (v0.3): Columns for additional datasets
+> - FRS ID: The FRS ID associated with each observation.
+> - NEEDS_UNIQUE_ID: The NEEDS ID associated with each observation.
+
+
 ## Important Notes
 
 ------------------------------------------------------------------------
