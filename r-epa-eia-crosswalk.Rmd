@@ -103,7 +103,7 @@ egrid_data_file <- "https://www.epa.gov/sites/production/files/2020-09/epa-eia_p
 include_FRS <- FALSE
 
 # include NEEDS IDs
-include_NEEDS <- TRUE
+include_NEEDS <- FALSE
 
 ```
 
