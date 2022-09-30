@@ -941,20 +941,22 @@ crosswalk_summary_table
 if(!include_FRS) {
   print("No FRS IDs added")
 } else {
-  get_frs_id <- function(camd_eia_crosswalk) {
+  get_frs_id <- function(plant_id) {
+    # The FRS database has the most information based on the EIA-860
     systems <- c("EIA-860", "CAMDBS", "EGRID")
     for (sys in systems) {
-      id <- get_frs_id_sys(camd_eia_crosswalk, sys)
+      id <- get_frs_id_sys(plant_id, sys)
       if (!is.na(id)) {
         return(id)
       }
     }
     return(NA)
   }
-  get_frs_id_sys <- function(camd_eia_crosswalk, sys) {
+
+  get_frs_id_sys <- function(plant_id, sys) {
     frs_endpoint <-
       str_glue(
-        "https://ofmpub.epa.gov/enviro/frs_rest_services.get_facilities?pgm_sys_acrnm={sys}&pgm_sys_id={oris}&output=JSON"
+        "https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities?pgm_sys_acrnm={sys}&pgm_sys_id={plant_id}&output=JSON"
       )
     response <- GET(frs_endpoint)
     text_json <-
@@ -968,12 +970,21 @@ if(!include_FRS) {
     return(as.numeric(frs_id))
   }
 
-  camd_eia_crosswalk <- add_column(FRS_ID = camd_eia_crosswalk$CAMD_PLANT_ID %>% map(get_frs_id)) %>%
-    rowwise() %>%
-    mutate(FRS_ID = paste(FRS_ID, collapse = ',')) %>%
-    ungroup()
+  if(!file.exists("data/FRS_ids.csv")) {
+    message(str_glue("Obtaining FRS IDs. This may take several minutes.\n{timestamp(quiet=TRUE)}"))
+  	system.time(
+	  frs <- camd_eia_crosswalk %>%
+	    distinct(CAMD_PLANT_ID) %>%
+	    mutate(FRS_ID = map_dbl(CAMD_PLANT_ID, get_frs_id)) %>%
+	    write_csv("data/FRS_ids.csv")
+  	)
+  	message(str_glue("{timestamp(quiet=TRUE)}\nFinished obtaining FRS IDs. Writing to data/FRS_ids.csv"))
+  } else {
+  	frs <- read_csv("data/FRS_ids.csv")
+  }
   
   camd_eia_crosswalk <- camd_eia_crosswalk %>%
+  	left_join(frs, by = "CAMD_PLANT_ID") %>%
     relocate(FRS_ID, .before = MATCH_TYPE_GEN)
 }
 
