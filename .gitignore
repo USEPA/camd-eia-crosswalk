@@ -6,6 +6,8 @@
 *.csv
 *.pdf
 !data/state_reference.csv
+!data/FRS_ids.csv
+!data/needs_v6_november_2018_reference_case_0.xlsx
 !examples/sample_data/camd_sample_data.csv
 !manual_matches.xlsx
 !epa_eia_crosswalk.csv
