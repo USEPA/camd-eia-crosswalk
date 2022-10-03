@@ -56,7 +56,7 @@ For more information on EIA's electricity data, see <https://www.eia.gov/electri
 
 ### How do I cite the crosswalk data?
 
-Huetteman, Justine; Tafoya, Johnathan; Johnson, Travis; and Schreifels, Jeremy. 2022. EPA-EIA Power Sector Data Crosswalk. Accessible at www.epa.gov/airmarkets/power_sector_data_crosswalk.
+Huetteman, Justine; Tafoya, Johnathan; Johnson, Travis; and Schreifels, Jeremy. 2021. EPA-EIA Power Sector Data Crosswalk. Accessible at www.epa.gov/airmarkets/power-sector-data-crosswalk.
 
 ## Methodology
 
