@@ -84,17 +84,27 @@ library(readxl) # Read data from xlsx files via read_excel()
 library(openxlsx) # Create and write to formatted xlsx documents
 
 library(purrr) # Use of partial and map functions
+
+library(rvest) # Used to query all links on NEEDS page.
 ```
 
 ## Assign key values for data retrieval
 ```{r}
 # API key for FACT API
-api_key <- "YOUR_API_KEY"
-eia_860_year <- 2018 # The  EIA data year (available at https://www.eia.gov/electricity/data/eia860/)
+api_key <- Sys.getenv("API_KEY_EIA")
+eia_860_year <- 2021 # The  EIA data year (available at https://www.eia.gov/electricity/data/eia860/)
 earliest_retirement_year <- 2010 # All units retired before this year are filtered out of the data
-eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{eia_860_year}.zip")
+
+if (eia_860_year < 2021){
+  eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{eia_860_year}.zip")
+}else{
+  eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/xls/eia860{eia_860_year}.zip")}
 egrid_data_file <- "https://www.epa.gov/sites/production/files/2020-09/epa-eia_plant_id_crosswalk.xlsx"
 ```
+```{r}
+api_key
+```
+
 
 ## Include Additional Datasets
 ```{r}
@@ -102,8 +112,9 @@ egrid_data_file <- "https://www.epa.gov/sites/production/files/2020-09/epa-eia_p
 # Note: adding FRS IDs may add several minutes of processing time to the code due to data retrieval.
 include_FRS <- FALSE
 
-# include NEEDS IDs
-include_NEEDS <- FALSE
+# include NEEDS IDs. By default, this will download the latest NEEDS data if the year used for analysis is not 2018.
+include_NEEDS <- TRUE
+
 
 ```
 
@@ -991,6 +1002,13 @@ if(!include_FRS) {
 ```
 
 ```{r, echo = TRUE}
+wd <- getwd()
+
+active_sheet
+```
+
+
+```{r, echo = TRUE}
 # add NEEDS IDs to crosswalk output
 # set to run/not run by changing TRUE/FALSE at the beginning of the code
 
@@ -999,10 +1017,28 @@ if(!include_NEEDS) {
 } else {
   wd <- getwd()
   
+  if (eia_860_year != 2018){ # Pull new data unless using 2018 data, which is already downloaded
+    # Get reference case links matching year
+    needs_url = "https://www.epa.gov/power-sector-modeling/national-electric-energy-data-system-needs"
+    page = read_html(needs_url)
+    links <- page %>% html_nodes("a") %>% html_attr("href") %>% str_subset(pattern = ".xlsx") %>% str_subset(regex("[R|r]eference[\\W|\\d]+[C|c]ase", TRUE)) %>% str_subset(pattern = as.character(eia_860_year)) 
+    print(length(links))
+    # If any, download
+    if (length(links) != 0){
+      path_to_file = str_glue("{wd}/data/needs_{eia_860_year}.xlsx")
+      download.file(
+    str_glue(paste("https://www.epa.gov", links[1], sep = "")),
+    str_glue(path_to_file))
+      
+  }} else { # For 2018 data or if file not found
+    path_to_file = str_glue("{wd}/data/needs_v6_november_2018_reference_case_0.xlsx")
+  }    
+  active_sheet = openxlsx::getSheetNames(path_to_file) %>% str_subset(pattern = regex("[A|a]ctive"))
+    
   needs <-
     read_excel(
-      str_glue("{wd}/data/needs_v6_november_2018_reference_case_0.xlsx"),
-      sheet = "NEEDS v6_Active",
+      str_glue(path_to_file),
+      sheet = active_sheet[1],
       range = cell_cols("B:E")
     ) %>%
     select(
@@ -1044,8 +1080,8 @@ if(!include_NEEDS) {
   
   camd_eia_crosswalk <- camd_eia_crosswalk %>%
     relocate(NEEDS_UNIQUE_ID, .before = MATCH_TYPE_GEN)
-}
 
+}
 ```
 
 ## Crosswalk output
