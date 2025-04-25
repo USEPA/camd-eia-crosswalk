@@ -11,97 +11,70 @@
 ##
 ## -------------------------------
 
-if (api_key == "YOUR_API_KEY") {
-  stop("You must provide a FACT API key")
+# Load libraries --------
+library(tidyverse)
+library(lubridate)
+library(httr)
+library(tidyjson)
+library(jsonlite)
+library(readxl)
+library(openxlsx)
+library(purrr)
+
+# Set up API and API key ----------
+
+# Read API key from text file
+api_key <- read_lines("api_keys/epa_api_key.txt")
+
+# Set up year dimensions
+eia_860_year <- 2018
+earliest_retirement_year <- 2010
+
+if (api_key == "YOUR_API_KEY") { # flag: default to this in epa_api_key.txt file
+  stop("You must provide a EPA API key")
 }
 
+# Call API using API key
 response <-
   GET(str_glue(
-    "https://api.epa.gov/FACT/1.0/facilities?api_key={api_key}"
+    "https://api.epa.gov/easey/camd-services/bulk-files?API_KEY={api_key}" # EPA/CAMPD API 
   ))
 
 # If something is wrong with the request, fail gracefully
 stop_for_status(response, content(response)$error$message)
 
-camd_plants_json <- content(response, as = "text") %>%
-  enter_object("data") # Top level json object that is an array of all the plants/oris
+## Get facility data --------
+camd_json <- fromJSON(rawToChar(response$content))
 
-camd_plants <- camd_plants_json %>%
-  gather_array() %>%
-  spread_all()
+# S3 bucket url base + s3Path (in get request) = the full path to the files
+bucket_url_base <- 'https://api.epa.gov/easey/bulk-files/'
+               
+facility_path <- 
+  camd_json %>% 
+  unnest(cols = metadata) %>% 
+  filter(year == eia_860_year, # flag: check if this is okay
+         dataType == "Facility") %>% 
+  pull(s3Path)
 
-camd_combustion_units <- camd_plants %>%
-  enter_object("units") %>%
-  gather_array() %>%
-  spread_all()
-
-# Filter CAMD data to filter out units that started operating after EIA data year
-# Filter out units that retired before earliest_retirement_year value
-camd_combustion_units <- camd_combustion_units %>%
-  filter((status == "OPR" &
-            ymd(as.Date(statusDate)) <= str_glue("{eia_860_year}-12-31")) |
-           (status %in% c("RET", "LTCS") &
-              ymd(as.Date(statusDate)) >= str_glue("{earliest_retirement_year}-01-01")))
-
-# Get the unit and generator IDs
-camd_generators <- camd_combustion_units %>%
-  enter_object("generators") %>%
-  gather_array() %>%
-  spread_all() %>%
-  select(
-    orisCode,
-    unitId,
-    generatorId,
-    nameplateCapacity
-  ) %>%
-  as_tibble()
-
-# Get the primary fuel description for each unit
-camd_fuels <- camd_combustion_units %>%
-  enter_object("fuels") %>%
-  gather_array() %>%
-  spread_all() %>%
-  subset(indicatorDescription == "Primary") %>%
-  select(
-    orisCode,
-    unitId,
-    fuelDesc
-  ) %>%
-  as_tibble()
-
-# Joining unit and generator ID with fuel into a complete units table
-camd_unit <- camd_combustion_units %>%
-  as_tibble() %>%
-  left_join(camd_generators,
-            by = c("orisCode", "unitId")
-  ) %>%
-  left_join(camd_fuels,
-            by = c("orisCode", "unitId")
-  ) %>%
-  select(
-    CAMD_PLANT_ID = "orisCode",
-    CAMD_FACILITY_NAME = "name",
-    CAMD_STATE = state.abbrev,
-    CAMD_LATITUDE = geographicLocation.latitude,
-    CAMD_LONGITUDE = geographicLocation.longitude,
-    CAMD_UNIT_ID = "unitId",
-    MOD_CAMD_UNIT_ID = "unitId",
-    CAMD_FUEL_TYPE = "fuelDesc",
-    CAMD_GENERATOR_ID = "generatorId",
-    MOD_CAMD_GENERATOR_ID = "generatorId",
-    CAMD_NAMEPLATE_CAPACITY = "nameplateCapacity",
-    CAMD_STATUS = "status",
-    CAMD_STATUS_DATE = "statusDate"
-  ) %>%
-  mutate(CAMD_RETIRE_YEAR = ifelse(CAMD_STATUS != "OPR", year(ymd(
-    as.Date(CAMD_STATUS_DATE)
-  )), 0)) %>%
-  arrange(CAMD_PLANT_ID, CAMD_UNIT_ID)
+# Clean up variable names and variable 
+facility_df <- 
+  read_csv(paste0(bucket_url_base,facility_path)) %>% 
+  rename_with(tolower) %>% # this protects NOx rates from getting split with clean_names()
+  janitor::clean_names() %>% 
+  mutate(
+    generator_ids = str_extract_all(associated_generators_nameplate_capacity_mwe, "\\S+(?= \\()"), # extracting associated generators
+    nameplate_capacity_char = (str_extract_all(associated_generators_nameplate_capacity_mwe, "(?<=\\()\\d+(\\.\\d+)?(?=\\))")), # extracting nameplate capacity values
+    associated_generators = purrr::map_chr(generator_ids, ~ paste(.x, collapse = ", ")), # pasting together associated generators
+    nameplate_capacity = purrr::map_dbl(nameplate_capacity_char, ~ sum(as.numeric(.x), na.rm = TRUE)),
+    retirement_year = ifelse(operating_status != "Operating", year(ymd(as.Date(commercial_operation_date))), 0), 
+    year = as.character(year),  # summing nameplate capacity from associated generators
+    mod_unit_id = unit_id) %>%
+  select(-"nameplate_capacity_char") %>% 
+  tidyr::unnest(cols = generator_ids) %>%
+  mutate(mod_generator_id = generator_ids) %>%
+  rename(generator_id = generator_ids) %>%
+  arrange(generator_id, unit_id)
 
 # Clean up
-rm(camd_plants_json)
-rm(camd_plants)
-rm(camd_fuels)
-rm(camd_generators)
-rm(camd_combustion_units)
+rm(camd_json)
 rm(response)
