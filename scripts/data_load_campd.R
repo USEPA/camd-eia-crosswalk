@@ -21,13 +21,16 @@ library(readxl)
 library(openxlsx)
 library(purrr)
 
+# Load necessary functions
+source("scripts/functions/function_save_output_data.R")
+
 # Set up API and API key ----------
 
 # Read API key from text file
 api_key <- read_lines("api_keys/epa_api_key.txt")
 
 # Set up year dimensions
-eia_860_year <- 2018
+crosswalk_year <- 2018
 earliest_retirement_year <- 2010
 
 if (api_key == "YOUR_API_KEY") { # flag: default to this in epa_api_key.txt file
@@ -52,7 +55,7 @@ bucket_url_base <- 'https://api.epa.gov/easey/bulk-files/'
 facility_path <- 
   camd_json %>% 
   unnest(cols = metadata) %>% 
-  filter(year == eia_860_year, # flag: check if this is okay
+  filter(year == crosswalk_year, # flag: check if this is okay
          dataType == "Facility") %>% 
   pull(s3Path)
 
@@ -78,3 +81,9 @@ facility_df <-
 # Clean up
 rm(camd_json)
 rm(response)
+
+## Saving EPA data 
+epa_file_path <- "data/raw_data/epa"
+epa_file_name <- "epa_raw.RDS"
+
+save_output_data(facility_df, epa_file_path, epa_file_name)

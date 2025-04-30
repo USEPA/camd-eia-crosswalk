@@ -13,19 +13,34 @@
 ##
 ## -------------------------------
 
-# Import plant, generator, and boiler (EnviroAssoc) data from EIA-860 using data year specified in eia_860_year
+# Load in libraries
+library(tidyverse)
+library(lubridate)
+library(httr)
+library(tidyjson)
+library(jsonlite)
+library(readxl)
+library(openxlsx)
+library(purrr)
 
+# Set up year dimensions
+crosswalk_year <- 2018
+earliest_retirement_year <- 2010
+
+eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{crosswalk_year}.zip")
+
+# Import plant, generator, and boiler (EnviroAssoc) data from EIA-860 using data year specified in eia_860_year
 download.file(
   eia_data_file,
-  str_glue("data/eia860{eia_860_year}.zip")
+  str_glue("data/eia860{crosswalk_year}.zip")
 )
 
-unzip(zipfile = str_glue("data/eia860{eia_860_year}.zip"), exdir = "data")
+unzip(zipfile = str_glue("data/eia860{crosswalk_year}.zip"), exdir = "data")
 
 # Get plant location data
 eia_plant <-
   read_excel(
-    str_glue("data/2___Plant_Y{eia_860_year}.xlsx"),
+    str_glue("data/2___Plant_Y{crosswalk_year}.xlsx"),
     sheet = "Plant",
     range = cell_cols("C:K"),
     skip = 1,
@@ -40,7 +55,7 @@ eia_plant <-
 # Get boiler ID
 eia_boiler <-
   read_excel(
-    str_glue("data/6_1_EnviroAssoc_Y{eia_860_year}.xlsx"),
+    str_glue("data/6_1_EnviroAssoc_Y{crosswalk_year}.xlsx"),
     sheet = "Boiler Generator",
     range = cell_cols("C:F"),
     skip = 1,
@@ -58,7 +73,7 @@ eia_boiler <-
 # Create a consolidated list of all units (retired and operating)
 eia_gen_opr <- # Operating units
   read_excel(
-    str_glue("data/3_1_Generator_Y{eia_860_year}.xlsx"),
+    str_glue("data/3_1_Generator_Y{crosswalk_year}.xlsx"),
     sheet = "Operable",
     range = cell_cols("C:AH"),
     skip = 1,
@@ -69,7 +84,7 @@ eia_gen_opr <- # Operating units
 
 eia_gen_ret <- # Retired units
   read_excel(
-    str_glue("data/3_1_Generator_Y{eia_860_year}.xlsx"),
+    str_glue("data/3_1_Generator_Y{crosswalk_year}.xlsx"),
     sheet = "Retired and Canceled",
     range = cell_cols("C:AH"),
     skip = 1,
@@ -103,4 +118,16 @@ eia_generator <- eia_generator %>%
 rm(eia_gen_opr)
 rm(eia_gen_ret)
 rm(eia_plant)
+
+# Creating list of necessary data
+eia_raw <- list(boiler = eia_boiler, 
+                generator = eia_generator)
+
+## Saving EIA data 
+
+eia_file_path <- "data/raw_data/eia"
+eia_file_name <- "eia_raw.RDS"
+
+save_output_data(eia_generator, eia_file_path, eia_file_name)
+
 

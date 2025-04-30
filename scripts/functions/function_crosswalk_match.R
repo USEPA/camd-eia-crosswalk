@@ -36,6 +36,7 @@
 #'   by = plant_generator_match,
 #'   "Step 1b: Modify IDs; remove special chars"
 #' )
+
 match_camd_eia_units <- function(camd_unmatched, eia_unmatched, by, match_type_label) {
   
   # We need to "enframe" the character vector of match_parameters
@@ -80,6 +81,7 @@ match_camd_eia_units <- function(camd_unmatched, eia_unmatched, by, match_type_l
 #'     eia_generator,
 #'     eia_by
 #'   )
+
 get_manual_matches <- function(manual_matches, manual_excluded, camd, eia, eia_by) {
   # We use the EIA/CAMD_PLANT_ID instead of MOD_EIA/CAMD_PLANT_ID because manual matches/unmatched will
   # use the identifiers from the source and not from the eGRID PLANT_ID crosswalk.
@@ -135,6 +137,7 @@ get_manual_matches <- function(manual_matches, manual_excluded, camd, eia, eia_b
 #' @examples
 #' get_unmatched(eia_generator, camd_eia_gen_crosswalk)
 #' get_unmatched(camd_unit, camd_eia_crosswalk, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))
+
 get_unmatched <- function(original_data, prev_matches, by = NULL) {
   if (missing(prev_matches) || is.na(prev_matches) || is.null(prev_matches)) {
     return(original_data)
