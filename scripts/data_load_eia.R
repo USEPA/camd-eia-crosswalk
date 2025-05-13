@@ -23,6 +23,9 @@ library(readxl)
 library(openxlsx)
 library(purrr)
 
+# Load necessary functions
+source("scripts/functions/function_save_output_data.R")
+
 # Set up year dimensions
 crosswalk_year <- 2018
 earliest_retirement_year <- 2010
@@ -47,9 +50,9 @@ eia_plant <-
     trim_ws = TRUE
   ) %>%
   select(
-    EIA_PLANT_ID = "Plant Code",
-    EIA_LATITUDE = "Latitude",
-    EIA_LONGITUDE = "Longitude"
+    eia_plant_id = "Plant Code",
+    eia_latitude = "Latitude",
+    eia_longitude = "Longitude"
   )
 
 # Get boiler ID
@@ -62,13 +65,13 @@ eia_boiler <-
     trim_ws = TRUE
   ) %>%
   select(
-    EIA_PLANT_ID = "Plant Code",
-    EIA_GENERATOR_ID = "Generator ID",
-    EIA_BOILER_ID = "Boiler ID",
-    MOD_EIA_BOILER_ID = "Boiler ID",
-    MOD_EIA_GENERATOR_ID = "Generator ID"
+    eia_plant_id = "Plant Code",
+    eia_generator_id = "Generator ID",
+    eia_boiler_id = "Boiler ID",
+    mod_eia_boiler_id = "Boiler ID",
+    mod_eia_generator_id = "Generator ID"
   ) %>%
-  inner_join(eia_plant, by = c("EIA_PLANT_ID"))
+  inner_join(eia_plant, by = c("eia_plant_id"))
 
 # Create a consolidated list of all units (retired and operating)
 eia_gen_opr <- # Operating units
@@ -96,23 +99,23 @@ eia_gen_ret <- # Retired units
 
 eia_generator <- rbind(eia_gen_opr, eia_gen_ret) %>%
   select(
-    EIA_PLANT_ID = "Plant Code",
-    EIA_PLANT_NAME = "Plant Name",
-    EIA_STATE = "State",
-    EIA_GENERATOR_ID = "Generator ID",
-    MOD_EIA_GENERATOR_ID = "Generator ID",
-    EIA_UNIT_TYPE = "Prime Mover",
-    EIA_NAMEPLATE_CAPACITY = "Nameplate Capacity (MW)",
-    EIA_FUEL_TYPE = "Energy Source 1",
-    EIA_RETIRE_YEAR = "Retirement Year"
+    eia_plant_id = "Plant Code",
+    eia_plant_name = "Plant Name",
+    eia_state = "State",
+    eia_generator_id = "Generator ID",
+    mod_eia_generator_id = "Generator ID",
+    eia_unit_type = "Prime Mover",
+    eia_nameplate_capacity = "Nameplate Capacity (MW)",
+    eia_fuel_type = "Energy Source 1",
+    eia_retire_year = "Retirement Year"
   ) %>%
   # Filter out renewable unit types https://www.epa.gov/sites/production/files/2017-01/egrid_code_lookup.xlsx
-  filter(!(EIA_UNIT_TYPE %in% c("BA", "CE", "CP", "FC", "FW", "HA", "HY", "PS", "PV", "WS", "WT")))
+  filter(!(eia_unit_type %in% c("BA", "CE", "CP", "FC", "FW", "HA", "HY", "PS", "PV", "WS", "WT")))
 
 
 # Add lat and long
 eia_generator <- eia_generator %>%
-  inner_join(eia_plant, by = c("EIA_PLANT_ID"))
+  inner_join(eia_plant, by = c("eia_plant_id"))
 
 # Clean up
 rm(eia_gen_opr)
@@ -124,7 +127,6 @@ eia_raw <- list(boiler = eia_boiler,
                 generator = eia_generator)
 
 ## Saving EIA data 
-
 eia_file_path <- "data/raw_data/eia"
 eia_file_name <- "eia_raw.RDS"
 
