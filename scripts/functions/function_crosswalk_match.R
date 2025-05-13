@@ -86,12 +86,12 @@ get_manual_matches <- function(manual_matches, manual_excluded, camd, eia, eia_b
   # We use the EIA/CAMD_PLANT_ID instead of MOD_EIA/CAMD_PLANT_ID because manual matches/unmatched will
   # use the identifiers from the source and not from the eGRID PLANT_ID crosswalk.
   
-  connection <- inner_join(camd, manual_matches, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))
+  connection <- inner_join(camd, manual_matches, by = c("camd_plant_id", "camd_unit_id", "camd_generator_id"))
   
   if (nrow(connection) < nrow(manual_matches)) {
     warning(paste(c(
-      "Warning:", str_glue("{nrow(manual_matches) - nrow(connection)} manual_matches do not match with CAMD\n"),
-      paste(format(anti_join(manual_matches, connection, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))), sep = "\n", collapse = "\n")
+      "Warning:", str_glue("{nrow(manual_matches) - nrow(connection)} manual_matches do not match with EPA\n"),
+      paste(format(anti_join(manual_matches, connection, by = c("camd_plant_id", "camd_unit_id", "camd_generator_id"))), sep = "\n", collapse = "\n")
     ),
     sep = "\n", collapse = "\n"
     ))
