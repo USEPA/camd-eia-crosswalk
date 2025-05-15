@@ -21,16 +21,16 @@ library(purrr) # Use of partial and map functions
 library(janitor)
 
 # Load necessary functions
-source("scripts/functions/function_crosswalk_match.R")
+source("scripts/functions/function_match_crosswalk.R")
 source("scripts/functions/function_modifier.R")
+source("scripts/functions/function_check_params.R")
 
 # Set up year dimensions
-crosswalk_year <- 2018
-earliest_retirement_year <- 2010
+params <- check_params()
 
 # Load data -------
-eia_raw <- readRDS(glue::glue("data/raw_data/eia/{crosswalk_year}/eia_raw.RDS"))
-epa_raw <- readRDS(glue::glue("data/raw_data/epa/{crosswalk_year}/epa_raw.RDS"))
+eia_raw <- readRDS(glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia_raw.RDS"))
+epa_raw <- readRDS(glue::glue("data/raw_data/epa/{params$crosswalk_year}/epa_raw.RDS"))
 
 # Set up raw data 
 eia_boiler <- eia_raw$boiler

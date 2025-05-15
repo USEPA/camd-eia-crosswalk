@@ -23,6 +23,7 @@ library(purrr)
 
 # Load necessary functions
 source("scripts/functions/function_save_output_data.R")
+source("scripts/functions/function_check_params.R")
 
 # Set up API and API key ----------
 
@@ -30,8 +31,7 @@ source("scripts/functions/function_save_output_data.R")
 api_key <- read_lines("api_keys/epa_api_key.txt")
 
 # Set up year dimensions
-crosswalk_year <- 2018
-earliest_retirement_year <- 2010
+params <- check_params()
 
 if (api_key == "YOUR_API_KEY") { # flag: default to this in epa_api_key.txt file
   stop("You must provide a EPA API key")
@@ -55,7 +55,7 @@ bucket_url_base <- 'https://api.epa.gov/easey/bulk-files/'
 facility_path <- 
   epa_json %>% 
   unnest(cols = metadata) %>% 
-  filter(year == crosswalk_year, # flag: check if this is okay
+  filter(year == params$crosswalk_year, # flag: check if this is okay
          dataType == "Facility") %>% 
   pull(s3Path)
 
@@ -69,7 +69,7 @@ facility_df <-
     nameplate_capacity_char = (str_extract_all(associated_generators_nameplate_capacity_mwe, "(?<=\\()\\d+(\\.\\d+)?(?=\\))")), # extracting nameplate capacity values
     associated_generators = purrr::map_chr(generator_ids, ~ paste(.x, collapse = ", ")), # pasting together associated generators
     nameplate_capacity = purrr::map_dbl(nameplate_capacity_char, ~ sum(as.numeric(.x), na.rm = TRUE)),
-    retirement_year = ifelse(operating_status != "Operating", year(ymd(as.Date(commercial_operation_date))), 0), 
+    retirement_year = ifelse(operating_status != "Operating", year(ymd(as.Date(commercial_operation_date))), 0), # switch from OPR to Operating - adjust in new version?
     year = as.character(year)) %>%  # summing nameplate capacity from associated generators) 
   select(-"nameplate_capacity_char") %>% 
   tidyr::unnest(cols = generator_ids) %>%
@@ -84,11 +84,10 @@ facility_df <-
          epa_generator_id = generator_ids,
          mod_epa_generator_id = generator_ids,
          epa_nameplate_capacity = nameplate_capacity, 
+         epa_retirement_year = retirement_year,
          epa_status = operating_status,
          epa_status_date = commercial_operation_date) %>%
   rename(generator_id = generator_ids) %>%
-  mutate(epa_retire_year = ifelse(epa_status != "Operating", 
-                                  year(ymd(as.Date(epa_status_date))), 0)) %>% # switch from OPR to Operating - adjust in new version?
   arrange(generator_id, unit_id)
 
 # Clean up

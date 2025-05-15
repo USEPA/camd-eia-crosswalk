@@ -40,20 +40,20 @@ save_output_data <- function(data, output_folder_path, filename){
     dir.create(glue::glue("{output_folder_path}"))
   }
   
-  if(dir.exists(glue::glue("{output_folder_path}/{crosswalk_year}"))) {
-    print(glue::glue("Folder {output_folder_path}/{crosswalk_year} already exists."))
+  if(dir.exists(glue::glue("{output_folder_path}/{params$crosswalk_year}"))) {
+    print(glue::glue("Folder {output_folder_path}/{params$crosswalk_year} already exists."))
   } else {
-    dir.create(glue::glue("{output_folder_path}/{crosswalk_year}"))
+    dir.create(glue::glue("{output_folder_path}/{params$crosswalk_year}"))
   }
   
-  print(glue::glue("Saving {filename} to folder {output_folder_path}/{crosswalk_year}"))
+  print(glue::glue("Saving {filename} to folder {output_folder_path}/{params$crosswalk_year}"))
   
   # save file
-  write_rds(data, glue::glue("{output_folder_path}/{crosswalk_year}/{filename}"))
+  write_rds(data, glue::glue("{output_folder_path}/{params$crosswalk_year}/{filename}"))
   
   # check if file is successfully written to folder
-  if(file.exists(glue::glue("{output_folder_path}/{crosswalk_year}/{filename}"))){
-    print(glue::glue("File {filename} successfully written to folder {output_folder_path}/{crosswalk_year}"))
+  if(file.exists(glue::glue("{output_folder_path}/{params$crosswalk_year}/{filename}"))){
+    print(glue::glue("File {filename} successfully written to folder {output_folder_path}/{params$crosswalk_year}"))
   } else {
     print(glue::glue("File {filename} failed to write to folder."))
   }
