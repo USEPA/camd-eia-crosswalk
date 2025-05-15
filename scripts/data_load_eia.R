@@ -130,6 +130,6 @@ eia_raw <- list(boiler = eia_boiler,
 eia_file_path <- "data/raw_data/eia"
 eia_file_name <- "eia_raw.RDS"
 
-save_output_data(eia_generator, eia_file_path, eia_file_name)
+save_output_data(eia_raw, eia_file_path, eia_file_name)
 
 

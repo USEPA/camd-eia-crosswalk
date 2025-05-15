@@ -89,7 +89,7 @@ library(purrr) # Use of partial and map functions
 ## Assign key values for data retrieval
 ```{r}
 # API key for FACT API
-api_key <- "YOUR_API_KEY"
+api_key <- "3TEo6ChbVNieZcNsX8ATkdrrw1qKf3PWpfco0Vow"
 eia_860_year <- 2018 # The  EIA data year (available at https://www.eia.gov/electricity/data/eia860/)
 earliest_retirement_year <- 2010 # All units retired before this year are filtered out of the data
 eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{eia_860_year}.zip")
@@ -524,13 +524,14 @@ get_manual_matches <- function(manual_matches, manual_excluded, camd, eia, eia_b
 #' get_unmatched(eia_generator, camd_eia_gen_crosswalk)
 #' get_unmatched(camd_unit, camd_eia_crosswalk, by = c("CAMD_PLANT_ID", "CAMD_UNIT_ID", "CAMD_GENERATOR_ID"))
 get_unmatched <- function(original_data, prev_matches, by = NULL) {
-  if (missing(prev_matches) || is.na(prev_matches) || is.null(prev_matches)) {
+  if (missing(prev_matches) || (length(prev_matches) == 1 && is.na(prev_matches)) || is.null(prev_matches)) {
     return(original_data)
   }
   if (!missing(by) || !is.null(by)) {
     return(anti_join(original_data, prev_matches, by = by))
-  }
-  anti_join(original_data, prev_matches)
+  } else 
+   anti_join(original_data, prev_matches)
+  
 }
 
 # Create a version of get_unmatched with the 'by' argument partially applied for camd and eia

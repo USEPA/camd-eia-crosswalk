@@ -47,13 +47,13 @@ response <-
 stop_for_status(response, content(response)$error$message)
 
 ## Get facility data --------
-camd_json <- fromJSON(rawToChar(response$content))
+epa_json <- fromJSON(rawToChar(response$content))
 
 # S3 bucket url base + s3Path (in get request) = the full path to the files
 bucket_url_base <- 'https://api.epa.gov/easey/bulk-files/'
                
 facility_path <- 
-  camd_json %>% 
+  epa_json %>% 
   unnest(cols = metadata) %>% 
   filter(year == crosswalk_year, # flag: check if this is okay
          dataType == "Facility") %>% 
@@ -70,16 +70,29 @@ facility_df <-
     associated_generators = purrr::map_chr(generator_ids, ~ paste(.x, collapse = ", ")), # pasting together associated generators
     nameplate_capacity = purrr::map_dbl(nameplate_capacity_char, ~ sum(as.numeric(.x), na.rm = TRUE)),
     retirement_year = ifelse(operating_status != "Operating", year(ymd(as.Date(commercial_operation_date))), 0), 
-    year = as.character(year),  # summing nameplate capacity from associated generators
-    mod_unit_id = unit_id) %>%
+    year = as.character(year)) %>%  # summing nameplate capacity from associated generators) 
   select(-"nameplate_capacity_char") %>% 
   tidyr::unnest(cols = generator_ids) %>%
-  mutate(mod_generator_id = generator_ids) %>%
+  mutate(epa_plant_id = facility_id,
+         epa_facility_name = facility_name,
+         epa_state = state,
+         epa_latitude = latitude,
+         epa_longitude = longitude,
+         epa_unit_id = unit_id,
+         mod_epa_unit_id = unit_id,
+         epa_fuel_type = primary_fuel_type,
+         epa_generator_id = generator_ids,
+         mod_epa_generator_id = generator_ids,
+         epa_nameplate_capacity = nameplate_capacity, 
+         epa_status = operating_status,
+         epa_status_date = commercial_operation_date) %>%
   rename(generator_id = generator_ids) %>%
+  mutate(epa_retire_year = ifelse(epa_status != "Operating", 
+                                  year(ymd(as.Date(epa_status_date))), 0)) %>% # switch from OPR to Operating - adjust in new version?
   arrange(generator_id, unit_id)
 
 # Clean up
-rm(camd_json)
+rm(epa_json)
 rm(response)
 
 ## Saving EPA data 
