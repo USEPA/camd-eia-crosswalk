@@ -1,0 +1,106 @@
+---
+title: "r-epa-eia-crosswalk"
+format: html
+editor: visual
+freeze: true
+format: 
+  html:
+    toc: true
+    toc-expand: true
+    toc-location: left
+    html-table-processing: none
+    code-fold: true
+execute: 
+  message: false
+  warning: false
+  error: false
+params:
+  crosswalk_year: "2018"
+  earliest_retirement_year: "2010"
+  include_FRS: false
+  include_NEEDS: false
+editor: visual
+project: 
+  execute_dir: project
+---
+
+# Overview
+
+This project includes all necessary scripts and documentation to create the EPA-EIA crosswalk.
+
+# Background
+
+This R script retrieves the Environmental Protection Agency's (EPA) Clean Air Markets (CAMD) [Power Sector Emissions Data](https://www.epa.gov/airmarkets/power-sector-emissions-data) and EIA's [860 power plant data](https://www.eia.gov/electricity/data/eia860/) about power plant units and maps the EIA data to EPA data. The EPA data are retrieved with the CAMD [FACT API](https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api) and the EIA data are retrieved from the Excel spreadsheets within the ZIP file. You have the option of specifying a different year for EIA data (e.g., the most current year).
+
+The larger data sets from EPA and EIA include information about power plant attributes, emissions, operations, fuel consumption, and electricity generation. This crosswalk relates key identifiers assigned to power plant units to make it easier to connect and use larger EPA and EIA data sets. The crosswalk can also be extended to other government data sets.
+
+Each power plant has a unique facility ID known as an ORIS code (EPA) or plant code (EIA). Steam power plants are made up of boilers (where fuel is combusted to generate steam that moves a turbine) and generators (where kinetic energy from the turbine is converted to electrical energy) to generate electricity. Natural gas-fired power plants are made up of or combustion turbines (where fuel is combusted to turn a turbine) and generators to generate electricity. Combined-cycle power plants also have heat recovery steam generators (where waste heat generates steam that moves a turbine). Boilers, combustion turbines, and generators are interchangeably referred to as units in the two data sets. Because CAMD data is collected for environmental compliance, CAMD considers units to be the combustion units (boilers or combustion turbines). EIA data is collected to track electricity generation, so EIA considers units to be generators. The combustion unit and generator IDs may not be the same, even if they are a part of the same system. In addition, reporting discrepancies may mean that the IDs may not match across the two agencies' databases. This crosswalk attempts to connect these components from both data sets.
+
+# Methodology
+
+## Modify mismatched plant codes
+
+There are some power plants that have a single PLANT_ID/ORIS code in CAMD's data set, but a different or multiple plant codes in EIA's data set. The known manual PLANT_ID matches are pulled in from the `manual_matches.xlsx` file. The EIA_PLANT_ID identifier for these known mismatches are modified and the result is placed in the MOD_EIA_PLANT_ID field (e.g. CAMD PLANT_ID of 330 should match with EIA_PLANT_ID 57901, so the MOD_EIA_PLANT_ID is changed to 57901 to include the match in the crosswalk). Units are matched using the identifiers preceded by `MOD_`
+
+>  Note:
+>  <br>Steps 1 and 2 are performed independently.
+>  <br>Each sub-step(a-d) within Step 1 and 2 is performed sequentially matching on only the unmatched from the previous sub-step(a-d)
+>  <br>To start, each identifier is copied to the field of the same name preceded by `MOD_` and each modification to the original identifier is placed in the corresponding `MOD_` field. This means that if a match occurs without modifying the identifier, the `MOD_` field will be an exact copy of the original identifier.
+>  <br>Joins are performed on the identifiers preceded by `MOD_`
+
+## Step 1: Match CAMD to EIA 3_1_Generator data set (retired and operational generators)
+
+Units are matched on ORIS/modified plant code and generator ID.
+
+- Manual matches and exclusions are pulled in from `manual_matches.xlsx`
+- Step 1a: Units are matched on original unit identifiers
+- Step 1b: Unit identifiers are modified to change to upper case and remove whitespace and special characters.
+- Step 1c: Unit identifiers are modified to change numbers as strings to numeric values.
+- Step 1d: Unit identifiers are modified to remove leading characters if the identifier ends in a number or a number-letter combination (e.g., CT1 becomes 1, CT1A becomes 1A).
+
+## Step 2: Match CAMD to EIA 6_1_EnviroAssoc data set (boilers and generators)
+
+Units are matched on ORIS/modified plant code, unit/boiler ID, and generator ID.
+
+- Manual matches and exclusions are pulled in from `manual_matches.xlsx`
+- Step 2a: Units are matched on original unit identifiers
+- Step 2b: Unit identifiers are modified to change to upper case and remove whitespace and special characters.
+- Step 2c: Unit identifiers are modified to change numbers as strings to numeric values.
+- Step 2d: Unit identifiers are modified to remove leading characters if the identifier ends in a number or a number-letter combination (e.g., CT1 becomes 1, CT1A becomes 1A).
+
+## Step 3: Join data sets from Step 1 and Step 2 to output a set of comprehensive matches that have all CAMD identifiers and all EIA identifiers where they exist. CAMD units that did not match in any step are added to the crosswalk with an indicator that they were unmatched.
+
+The two sets are joined on CAMD_PLANT_ID, CAMD_UNIT_ID, CAMD_GENERATOR_ID, EIA_PLANT_ID, and EIA_GENERATOR_ID
+
+> Note:
+> <br>To use this code, you will need an API key. You can request one from the [FACT API overview](https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api#signup).
+
+# Processing
+
+## Load required packages
+```{r}
+#| label: load-packages
+#| echo: TRUE
+
+rm(list = ls())
+
+library(tidyverse)
+# tidyr - Help create tidy data
+# stringr - Make working with strings easier (string_glue())
+# readr - Read csv, txt, etc
+# tibble - Wrapper for data.frames that makes things easier (e.g. never converts strings to factors)
+
+library(lubridate) # Make working with dates easier
+
+library(httr) # Perform HTTP requests (in this case used to get data from FACT API)
+
+library(tidyjson) # Work with json objects in a tidy way. Useful for highly nested objects and "ragged" arrays and/or objects (varying lengths by document)
+
+library(jsonlite)
+
+library(readxl) # Read data from xlsx files via read_excel()
+
+library(openxlsx) # Create and write to formatted xlsx documents
+
+library(purrr) # Use of partial and map functions
+```

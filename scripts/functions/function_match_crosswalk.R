@@ -59,7 +59,7 @@ match_epa_eia_units <- function(epa_unmatched, eia_unmatched, by, match_type_lab
                                 keep = TRUE
   ) %>%
     # Restore the columns that are collapsed after join via restore_cols
-    mutate(!!!restore_cols, MATCH_TYPE = match_type_label)
+    mutate(!!!restore_cols, match_type = match_type_label)
   
   return(epa_eia_matches)
 }

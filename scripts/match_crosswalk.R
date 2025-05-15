@@ -418,7 +418,7 @@ epa_eia_crosswalk <- epa_eia_gen_crosswalk %>%
   ) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
 
-## Get unmatched after all Steps
+## Get unmatched after all steps
 epa_unmatched <- get_epa_unmatched(epa_unit, epa_eia_crosswalk) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
 eia_gen_unmatched <- get_unmatched(eia_generator, epa_eia_crosswalk, by = c("eia_plant_id", "eia_generator_id"))
