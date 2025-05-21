@@ -28,7 +28,11 @@ source("scripts/functions/function_save_output_data.R")
 source("scripts/functions/function_check_params.R")
 
 # Set up year dimensions
-params <- check_params()
+if (!exists("params")) {
+  params <- check_params()
+} else {
+  print("Crosswalk parameters are already defined.")
+}
 
 eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{params$crosswalk_year}.zip")
 

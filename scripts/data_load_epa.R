@@ -31,7 +31,11 @@ source("scripts/functions/function_check_params.R")
 api_key <- read_lines("api_keys/epa_api_key.txt")
 
 # Set up year dimensions
-params <- check_params()
+if (!exists("params")) {
+  params <- check_params()
+} else {
+  print("Crosswalk parameters are already defined.")
+}
 
 if (api_key == "YOUR_API_KEY") { # flag: default to this in epa_api_key.txt file
   stop("You must provide a EPA API key")
@@ -84,7 +88,7 @@ facility_df <-
          epa_generator_id = generator_ids,
          mod_epa_generator_id = generator_ids,
          epa_nameplate_capacity = nameplate_capacity, 
-         epa_retirement_year = retirement_year,
+         epa_retire_year = retirement_year,
          epa_status = operating_status,
          epa_status_date = commercial_operation_date) %>%
   rename(generator_id = generator_ids) %>%
