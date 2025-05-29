@@ -17,6 +17,7 @@ params:
   earliest_retirement_year: "2010"
   include_FRS: false
   include_NEEDS: false
+  output_agg: "plant"
 project: 
   execute_dir: project
 editor: visual
@@ -40,7 +41,13 @@ Each power plant has a unique facility ID known as an ORIS code (EPA) or plant c
 
 There are some power plants that have a single `plant_id`/`ORIS code` in EPA's data set, but a different or multiple plant codes in EIA's data set. The known manual `plant_id` matches are pulled in from the `manual_matches.xlsx` file. The `eia_plant_id` identifier for these known mismatches are modified and the result is placed in the MOD_EIA_PLANT_ID field (e.g. CAMD PLANT_ID of 330 should match with `eia_plant_id` 57901, so the `mod_eia_plant_id` is changed to 57901 to include the match in the crosswalk). Units are matched using the identifiers preceded by `mod_`
 
-> Note: <br>Steps 1 and 2 are performed independently. <br>Each sub-step(a-d) within Step 1 and 2 is performed sequentially matching on only the unmatched from the previous sub-step(a-d) <br>To start, each identifier is copied to the field of the same name preceded by `mod_` and each modification to the original identifier is placed in the corresponding `mod_` field. This means that if a match occurs without modifying the identifier, the `mod_` field will be an exact copy of the original identifier. <br>Joins are performed on the identifiers preceded by `mod_`
+> Note: <br>Steps 1 and 2 are performed independently.
+>
+> <br>Each sub-step(a-d) within Step 1 and 2 is performed sequentially matching on only the unmatched from the previous sub-step(a-d)
+>
+> <br>To start, each identifier is copied to the field of the same name preceded by `mod_` and each modification to the original identifier is placed in the corresponding `mod_` field. This means that if a match occurs without modifying the identifier, the `mod_` field will be an exact copy of the original identifier.
+>
+> <br>Joins are performed on the identifiers preceded by `mod_`
 
 ## Step 1: Match EPA to EIA 3_1_Generator data set (retired and operational generators)
 
@@ -66,7 +73,7 @@ Units are matched on ORIS/modified plant code, unit/boiler ID, and generator ID.
 
 The two sets are joined on `epa_plant_id`, `epa_unit_id`, `epa_generator_id`, `eia_plant_id`, and `eia_generator_id`
 
-> Note: <br>To use this code, you will need an API key. You can request one from the [CAPD API overview](https://www.epa.gov/power-sector/cam-api-portal#/documentation). 
+> Note: <br>To use this code, you will need an API key. You can request one from the [CAPD API overview](https://www.epa.gov/power-sector/cam-api-portal#/documentation).
 
 # Processing
 
@@ -237,8 +244,11 @@ Look for matches on the modified EPA and EIA unit identifiers between CAMD and E
 ```{r}
 #| label: match-crosswalk-data 
 #| file: "scripts/match_crosswalk.R" 
-#| results: hold
 #| echo: false
+
+print(generator_match_summary)
+
+print(boiler_match_summary)
 ```
 
 ### Match Summary
@@ -305,7 +315,11 @@ if(!params$include_NEEDS) {
 }
 ```
 
-## Crosswalk output
+## Crosswalk Output
+
+This document outputs an Excel file and a CSV file aggregated based on the params input `output_agg`.
+
+**Current output aggregation: `r params$output_agg`**
 
 ```{r}
 #| label: output-crosswalk

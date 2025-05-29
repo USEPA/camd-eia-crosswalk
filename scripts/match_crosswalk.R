@@ -37,8 +37,8 @@ eia_raw <- readRDS(glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia_raw
 epa_raw <- readRDS(glue::glue("data/raw_data/epa/{params$crosswalk_year}/epa_raw.RDS"))
 
 # Set up raw data 
-eia_boiler <- eia_raw$boiler
-eia_generator <- eia_raw$generator
+eia_boiler_raw <- eia_raw$boiler
+eia_generator_raw <- eia_raw$generator
 
 epa_unit <- epa_raw
 
@@ -86,13 +86,13 @@ plant_id_replacements <- plant_id_replacements %>% deframe()
 # The !!! operator forces-splice the named character vector of plant code corrections
 # meaning that they each become one argument to the recode function instead of one character vector as an arugment
 # i.e. recode(c(a="1", b="2", c="3")) becomes recode(a="1", b="2", c="3")
-eia_generator <- eia_generator %>%
+eia_generator_modified <- eia_generator_raw %>%
   mutate(
     mod_eia_plant_id = recode(eia_plant_id, !!!plant_id_replacements),
     plant_id_change_flag = ifelse(eia_plant_id != mod_eia_plant_id, 1, 0)
   )
 
-eia_boiler <- eia_boiler %>%
+eia_boiler_modified <- eia_boiler_raw %>%
   mutate(
     mod_eia_plant_id = recode(eia_plant_id, !!!plant_id_replacements),
     plant_id_change_flag = ifelse(eia_plant_id != mod_eia_plant_id, 1, 0)
@@ -129,57 +129,57 @@ epa_eia_gen_crosswalk <-
     unit_manual_matches,
     unit_manual_excluded,
     epa_unit,
-    eia_generator,
+    eia_generator_modified,
     eia_by = c("eia_plant_id", "eia_generator_id")
   )
 
-epa_eia_gen_crosswalk <- epa_eia_gen_crosswalk %>%
+epa_eia_gen_crosswalk_2 <- epa_eia_gen_crosswalk %>%
   bind_rows(
     match_epa_eia_units(
       get_epa_unmatched(epa_unit, epa_eia_gen_crosswalk),
-      get_unmatched(eia_generator, epa_eia_gen_crosswalk, by = c("eia_plant_id", "eia_generator_id")),
+      get_unmatched(eia_generator_modified, epa_eia_gen_crosswalk, by = c("eia_plant_id", "eia_generator_id")),
       by = plant_generator_match,
       str_glue("{generator_step_string}a: Exact match")
     )
   )
 
-epa_eia_gen_crosswalk <- epa_eia_gen_crosswalk %>%
+epa_eia_gen_crosswalk_3 <- epa_eia_gen_crosswalk_2 %>%
   bind_rows(
     match_epa_eia_units(
-      get_epa_unmatched(epa_unit, epa_eia_gen_crosswalk) %>%
+      get_epa_unmatched(epa_unit, epa_eia_gen_crosswalk_2) %>%
         mutate(across(c(mod_epa_generator_id), mod_identifiers_special_char)), # modify
-      get_unmatched(eia_generator, epa_eia_gen_crosswalk, by = c("eia_plant_id", "eia_generator_id")) %>%
+      get_unmatched(eia_generator_modified, epa_eia_gen_crosswalk_2, by = c("eia_plant_id", "eia_generator_id")) %>%
         mutate(across(c(mod_eia_generator_id), mod_identifiers_special_char)), # modify
       by = plant_generator_match,
       str_glue("{generator_step_string}b: Modify IDs; remove special chars")
     )
   )
 
-epa_eia_gen_crosswalk <- epa_eia_gen_crosswalk %>%
+epa_eia_gen_crosswalk_4 <- epa_eia_gen_crosswalk_3 %>%
   bind_rows(
     match_epa_eia_units(
-      get_epa_unmatched(epa_unit, epa_eia_gen_crosswalk) %>%
+      get_epa_unmatched(epa_unit, epa_eia_gen_crosswalk_3) %>%
         mutate(across(c(mod_epa_generator_id), mod_to_numeric)), # modify
-      get_unmatched(eia_generator, epa_eia_gen_crosswalk, by = c("eia_plant_id", "eia_generator_id")) %>%
+      get_unmatched(eia_generator_modified, epa_eia_gen_crosswalk_3, by = c("eia_plant_id", "eia_generator_id")) %>%
         mutate(across(c(mod_eia_generator_id), mod_to_numeric)), # modify
       by = plant_generator_match,
       str_glue("{generator_step_string}c: Modify IDs; convert to numeric")
     )
   )
 
-epa_eia_gen_crosswalk <- epa_eia_gen_crosswalk %>%
+epa_eia_gen_crosswalk_5 <- epa_eia_gen_crosswalk_4 %>%
   bind_rows(
     match_epa_eia_units(
-      get_epa_unmatched(epa_unit, epa_eia_gen_crosswalk) %>%
+      get_epa_unmatched(epa_unit, epa_eia_gen_crosswalk_4) %>%
         mutate(across(c(mod_epa_generator_id), mod_identifiers_leading_letters)), # modify
-      get_unmatched(eia_generator, epa_eia_gen_crosswalk, by = c("eia_plant_id", "eia_generator_id")) %>%
+      get_unmatched(eia_generator_modified, epa_eia_gen_crosswalk_4, by = c("eia_plant_id", "eia_generator_id")) %>%
         mutate(across(c(mod_eia_generator_id), mod_identifiers_leading_letters)), # modify
       by = plant_generator_match,
       str_glue("{generator_step_string}d: Modify IDs; remove leading letters")
     )
   )
 
-generator_match_summary <- epa_eia_gen_crosswalk %>%
+generator_match_summary <- epa_eia_gen_crosswalk_5 %>%
   group_by(match_type) %>%
   mutate(match_type = as.character(match_type)) %>%
   summarize(
@@ -205,57 +205,57 @@ epa_eia_boiler_crosswalk <-
     unit_manual_matches %>% filter(!is.na(eia_boiler_id)),
     unit_manual_excluded,
     epa_unit,
-    eia_boiler,
+    eia_boiler_modified,
     eia_by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")
   )
 
-epa_eia_boiler_crosswalk <- epa_eia_boiler_crosswalk %>%
+epa_eia_boiler_crosswalk_2 <- epa_eia_boiler_crosswalk %>%
   bind_rows(
     match_epa_eia_units(
       get_epa_unmatched(epa_unit, epa_eia_boiler_crosswalk),
-      get_unmatched(eia_boiler, epa_eia_boiler_crosswalk, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")),
+      get_unmatched(eia_boiler_modified, epa_eia_boiler_crosswalk, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")),
       by = plant_boiler_gen_match,
       str_glue("{boiler_step_string}a: Exact match")
     )
   )
 
-epa_eia_boiler_crosswalk <- epa_eia_boiler_crosswalk %>%
+epa_eia_boiler_crosswalk_3 <- epa_eia_boiler_crosswalk_2 %>%
   bind_rows(
     match_epa_eia_units(
-      get_epa_unmatched(epa_unit, epa_eia_boiler_crosswalk) %>%
+      get_epa_unmatched(epa_unit, epa_eia_boiler_crosswalk_2) %>%
         mutate(across(c(mod_epa_unit_id, mod_epa_generator_id), mod_identifiers_special_char)), # modify
-      get_unmatched(eia_boiler, epa_eia_boiler_crosswalk, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")) %>%
+      get_unmatched(eia_boiler_modified, epa_eia_boiler_crosswalk_2, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")) %>%
         mutate(across(c(mod_eia_boiler_id, mod_eia_generator_id), mod_identifiers_special_char)), # modify
       by = plant_boiler_gen_match,
       str_glue("{boiler_step_string}b: Modify IDs; remove special chars")
     )
   )
 
-epa_eia_boiler_crosswalk <- epa_eia_boiler_crosswalk %>%
+epa_eia_boiler_crosswalk_4 <- epa_eia_boiler_crosswalk_3 %>%
   bind_rows(
     match_epa_eia_units(
-      get_epa_unmatched(epa_unit, epa_eia_boiler_crosswalk) %>%
+      get_epa_unmatched(epa_unit, epa_eia_boiler_crosswalk_3) %>%
         mutate(across(c(mod_epa_unit_id, mod_epa_generator_id), mod_to_numeric)), # modify
-      get_unmatched(eia_boiler, epa_eia_boiler_crosswalk, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")) %>%
+      get_unmatched(eia_boiler_modified, epa_eia_boiler_crosswalk_3, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")) %>%
         mutate(across(c(mod_eia_boiler_id, mod_eia_generator_id), mod_to_numeric)), # modify
       by = plant_boiler_gen_match,
       str_glue("{boiler_step_string}c: Modify IDs; convert to numeric")
     )
   )
 
-epa_eia_boiler_crosswalk <- epa_eia_boiler_crosswalk %>%
+epa_eia_boiler_crosswalk_5 <- epa_eia_boiler_crosswalk_4 %>%
   bind_rows(
     match_epa_eia_units(
-      get_epa_unmatched(epa_unit, epa_eia_boiler_crosswalk) %>%
+      get_epa_unmatched(epa_unit, epa_eia_boiler_crosswalk_4) %>%
         mutate(across(c(mod_epa_unit_id, mod_epa_generator_id), mod_identifiers_leading_letters)), # modify
-      get_unmatched(eia_boiler, epa_eia_boiler_crosswalk, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")) %>%
+      get_unmatched(eia_boiler_modified, epa_eia_boiler_crosswalk_4, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id")) %>%
         mutate(across(c(mod_eia_boiler_id, mod_eia_generator_id), mod_identifiers_leading_letters)), # modify
       by = plant_boiler_gen_match,
       str_glue("{boiler_step_string}d: Modify IDs; remove leading letters")
     )
   )
 
-boiler_match_summary <- epa_eia_boiler_crosswalk %>%
+boiler_match_summary <- epa_eia_boiler_crosswalk_5 %>%
   group_by(match_type) %>%
   mutate(match_type = as.character(match_type)) %>%
   summarize(
@@ -271,7 +271,7 @@ boiler_match_summary <- epa_eia_boiler_crosswalk %>%
 print(boiler_match_summary)
 
 ## Step 3: Join data sets from Step 2 and Step 3 to have a set of comprehensive matches that have all EPA identifiers and all EIA identifiers where they exist.
-epa_eia_crosswalk <- epa_eia_gen_crosswalk %>%
+epa_eia_crosswalk <- epa_eia_gen_crosswalk_5 %>%
   # We needed the manual matches/unmatched in the gen/boiler crosswalks to keep them out of the process,
   # but now we need to pull them out to join the two crosswalks, since their inclusion creates duplicates in this
   # left_join.
@@ -280,7 +280,7 @@ epa_eia_crosswalk <- epa_eia_gen_crosswalk %>%
   # Only the manual matches have a boiler ID at this point.
   select(-eia_boiler_id) %>%
   left_join(
-    epa_eia_boiler_crosswalk %>%
+    epa_eia_boiler_crosswalk_5 %>%
       filter(str_detect(match_type, "Manual", negate = TRUE)) %>%
       select(
         epa_plant_id,
@@ -310,7 +310,7 @@ epa_eia_crosswalk <- epa_eia_gen_crosswalk %>%
       epa_unit,
       # The generator file is sufficient here, because we just need the facility info
       # and this will pull in all the manual matches, since generator ID is required in the manual matches file.
-      eia_generator,
+      eia_generator_modified,
       eia_by = c("eia_plant_id", "eia_generator_id")
     ) %>%
       # Set the MATCH_TYPE_GEN/BOILER to the MATCH_TYPE from get_manual_matches
@@ -318,50 +318,57 @@ epa_eia_crosswalk <- epa_eia_gen_crosswalk %>%
         match_type_gen = match_type,
         match_type_boiler = match_type,
       )
-  ) %>%
-  select(
-    epa_state,
-    epa_facility_name,
-    epa_plant_id,
-    epa_unit_id,
-    epa_generator_id,
-    epa_nameplate_capacity,
-    epa_fuel_type,
-    epa_latitude,
-    epa_longitude,
-    epa_status,
-    epa_status_date,
-    epa_retire_year,
-    mod_epa_unit_id,
-    mod_epa_generator_id,
-    eia_state,
-    eia_plant_name,
-    eia_plant_id,
-    eia_generator_id,
-    eia_nameplate_capacity,
-    eia_boiler_id,
-    eia_unit_type,
-    eia_fuel_type,
-    eia_latitude,
-    eia_longitude,
-    eia_retire_year,
-    plant_id_change_flag,
-    mod_eia_plant_id,
-    mod_eia_boiler_id,
-    mod_eia_generator_id_boiler,
-    mod_eia_generator_id_gen,
-    match_type_gen,
-    match_type_boiler
-  ) %>%
+  )
+
+# columns in the output
+final_crosswalk_cols <- 
+    c(
+    "epa_state",
+    "epa_facility_name",
+    "epa_plant_id",
+    "epa_unit_id",
+    "epa_generator_id",
+    "epa_nameplate_capacity",
+    "epa_fuel_type",
+    "epa_latitude",
+    "epa_longitude",
+    "epa_status",
+    "epa_status_date",
+    "epa_retire_year",
+    "mod_epa_unit_id",
+    "mod_epa_generator_id",
+    "eia_state",
+    "eia_plant_name",
+    "eia_plant_id",
+    "eia_generator_id",
+    "eia_nameplate_capacity",
+    "eia_boiler_id",
+    "eia_unit_type",
+    "eia_fuel_type",
+    "eia_latitude",
+    "eia_longitude",
+    "eia_retire_year",
+    "plant_id_change_flag",
+    "mod_eia_plant_id",
+    "mod_eia_boiler_id",
+    "mod_eia_generator_id_boiler",
+    "mod_eia_generator_id_gen",
+    "match_type_gen",
+    "match_type_boiler"
+  ) 
+
+
+epa_eia_crosswalk_2 <- epa_eia_crosswalk %>%
+  select(final_crosswalk_cols) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
 
 ## Get unmatched after all steps
-epa_unmatched <- get_epa_unmatched(epa_unit, epa_eia_crosswalk) %>%
+epa_unmatched <- get_epa_unmatched(epa_unit, epa_eia_crosswalk_2) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
-eia_gen_unmatched <- get_unmatched(eia_generator, epa_eia_crosswalk, by = c("eia_plant_id", "eia_generator_id"))
-eia_boiler_unmatched <- get_unmatched(eia_boiler, epa_eia_crosswalk, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id"))
+eia_gen_unmatched <- get_unmatched(eia_generator_modified, epa_eia_crosswalk_2, by = c("eia_plant_id", "eia_generator_id"))
+eia_boiler_unmatched <- get_unmatched(eia_boiler_modified, epa_eia_crosswalk_2, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id"))
 
-epa_unmatched <- epa_unmatched %>%
+epa_unmatched_2 <- epa_unmatched %>%
   mutate(
     match_type_gen = "EPA Unmatched",
     match_type_boiler = "EPA Unmatched"
@@ -369,8 +376,8 @@ epa_unmatched <- epa_unmatched %>%
 
 # Bind the unmatched EPA units to the result 
 # flag: change this to be editable in params to include or not include outputs
-epa_eia_crosswalk <- epa_eia_crosswalk %>%
-  bind_rows(epa_unmatched) %>%
+epa_eia_crosswalk_3 <- epa_eia_crosswalk_2 %>%
+  bind_rows(epa_unmatched_2 %>% select(any_of(final_crosswalk_cols))) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id) %>%
   mutate(
     sequence_number = row_number(),
