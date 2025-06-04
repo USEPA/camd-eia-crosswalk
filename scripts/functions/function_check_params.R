@@ -39,8 +39,6 @@ check_params <- function() {
     params$crosswalk_year <- as.character(params$crosswalk_year)
     params$earliest_retirement_year <- readline(prompt = "Input earliest_retirement_year: ")
     params$earliest_retirement_year <- as.character(params$earliest_retirement_year)
-    params$include_FRS <- readline(prompt = "Input include_FRS (TRUE/FALSE): ")
-    params$include_NEEDS <- readline(prompt = "Input include_NEEDS (TRUE/FALSE): ")
   }
   
   # valid eGRID years (update this every crosswalk year to include latest year)
@@ -56,14 +54,6 @@ check_params <- function() {
     return(check_params()) # restart function for new inputs
   }
 
-  
-  # valid temporal_res inputs
-  # temporal_res_inputs <- c("annual", "monthly")
-  # 
-  # if (!(params$temporal_res %in% temporal_res_inputs)) {
-  #   print("The input for params$temporal_res is not one of the valid responses. Please input either annual, monthly, daily, or hourly.")
-  #   return(check_params()) # restart function for new inputs
-  # }
-  
+
   return(params)
 }

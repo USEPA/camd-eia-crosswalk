@@ -17,7 +17,8 @@ params:
   earliest_retirement_year: "2010"
   include_FRS: false
   include_NEEDS: false
-  output_agg: "plant"
+  output_agg: "unit"
+  unmatch_only: false
 project: 
   execute_dir: project
 editor: visual
@@ -176,7 +177,7 @@ This section imports the unit and generator data from the EPA CAPD API. **An EPA
 
 ### Import EIA data
 
-This section downloads and imports data from EIA-860 for the year specified above. To manually download the data from EIA, visit the [EIA-860 data](https://www.eia.gov/electricity/data/eia860/). Select and download the latest year's ZIP file on the right-hand-side of the page. The files used in this analysis are "3_1_Generator_Y`r params$crosswalk_year`.xlsx" and "6_1_EnviroAssoc_Y`r params$crosswalk_year`.xlsx", with "2\_\_\_Plant_Y`r params$crosswalk_year`.xlsx" to get lat/long.
+This section downloads and imports data from EIA-860 for the year specified above. To manually download the data from EIA, visit the [EIA-860 data](https://www.eia.gov/electricity/data/eia860/). Select and download the latest year's ZIP file on the right-hand-side of the page. The files used in this analysis are **3_1_Generator_Y`r params$crosswalk_year`.xlsx** and **6_1_EnviroAssoc_Y`r params$crosswalk_year`.xlsx**, with **2\_\_\_Plant_Y`r params$crosswalk_year`.xlsx** to get lat/long.
 
 ```{r}
 #| label: data-load-eia 

@@ -9,7 +9,7 @@
 ##
 ## -------------------------------
 
-output_crosswalk <- function(epa_eia_crosswalk, agg_level = c("plant")) {
+output_crosswalk <- function(epa_eia_crosswalk, agg_level, unmatch_only = FALSE) {
   
   field_description_labels <-
     c("sequence_number"             = "Row number assigned to each observation. Included for purposes of sorting to original order.",
@@ -58,12 +58,12 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level = c("plant")) {
       "epa_facility_name",
       "epa_plant_id",
       "epa_latitude",
-      "epa_longitude")
+      "epa_longitude",
       # "eia_state",
       # "eia_plant_name",
       # "eia_plant_id",
-      # "eia_latitude",
-      # "eia_longitude")
+      "eia_latitude",
+      "eia_longitude")
   
   if (agg_level == "plant") {
     agg_groupby_cols <-
@@ -71,12 +71,15 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level = c("plant")) {
   } else if (agg_level == "generator") {
     agg_groupby_cols <-
       c(agg_groupby_cols,
-        "epa_generator_id")
+        "epa_generator_id",
+        "mod_epa_generator_id")
   } else if (agg_level == "unit") {
     agg_groupby_cols <-
       c(agg_groupby_cols,
         "epa_generator_id",
-        "epa_unit_id")
+        "epa_unit_id",
+        "mod_epa_generator_id",
+        "mod_epa_unit_id")
   }
   
   # define which columns to concatenate text by aggregation level
@@ -92,7 +95,12 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level = c("plant")) {
       "eia_plant_id",
       "eia_generator_id",
       "eia_boiler_id",
+      "eia_unit_type",
       "plant_id_change_flag",
+      "mod_eia_plant_id",
+      "mod_eia_boiler_id", 
+      "mod_eia_generator_id_boiler",
+      "mod_eia_generator_id_gen",
       "match_type_gen",
       "match_type_boiler")
   
@@ -121,57 +129,71 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level = c("plant")) {
   
   epa_eia_crosswalk <- epa_eia_crosswalk %>%
                        group_by(pick(all_of(agg_groupby_cols))) %>%
-                       summarize(across(agg_concat_cols, ~paste(unique(.x), collapse = ", ")),
-                              across(agg_sum_cols, ~sum(.x, na.rm = TRUE))) %>%
-                       ungroup()
+                       summarize(across(all_of(agg_concat_cols), ~paste(unique(.x), collapse = ", ")),
+                              across(all_of(agg_sum_cols), ~sum(.x, na.rm = TRUE))) %>%
+                       ungroup() %>%
+                       mutate(sequence_number = row_number()) %>%
+                       select(field_col_names)
   
+  if (unmatch_only) {
+    epa_eia_crosswalk <- epa_eia_crosswalk %>%
+                         filter(match_type_gen == "EPA Unmatched" | match_type_boiler == "EPA Unmatched")
+    file_name <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}_unmatched.xlsx")
+    file_name_csv <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}_unmatched.csv")
+  } else {
+    file_name <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.xlsx")
+    file_name_csv <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.csv")
+  }
   
   # Create/modify xlsx workbook and worksheet to add text format to cells, preventing Excel from
   # changing some GENIDs and UNIT_IDs to dates and other automatic formatting issues
-  if (!file.exists(glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.xlsx"))) {
+  if (!file.exists(file_name)) {
     wb <- createWorkbook()
   } else {
-    wb <- loadWorkbook(glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.xlsx"))
+    wb <- loadWorkbook(file_name)
     # must remove worksheet to replace the data
-    #removeWorksheet(wb, "field_descriptions")
+    removeWorksheet(wb, "field_descriptions")
     removeWorksheet(wb, "epa_eia_crosswalk")
   }
-  
+
   addWorksheet(wb, "field_descriptions")
   addWorksheet(wb, "epa_eia_crosswalk")
-  
+
   # The numFmt = TEXT specifies text format for the cells,
   # thus avoiding the automatic conversion to dates
   # (e.g. 6-1 and 1-1 wont be converted to Jun-1, Jan-1) when "GENERAL" format is used
   textstyle <- createStyle(fontName = "Calibri", fontSize = 11, numFmt = "TEXT")
-  
+
   writeDataTable(wb = wb, sheet = "field_descriptions", x = field_desc_df)
-  
+
   addStyle(
     wb = wb, sheet = "field_descriptions",
     rows = 1:nrow(field_desc_df), cols = 1:ncol(field_desc_df),
     style = textstyle, gridExpand = TRUE
   )
-  
+
   writeDataTable(wb = wb, sheet = "epa_eia_crosswalk", x = epa_eia_crosswalk)
-  
+
   addStyle(
     wb = wb, sheet = "epa_eia_crosswalk",
     rows = 1:nrow(epa_eia_crosswalk), cols = 1:ncol(epa_eia_crosswalk),
     style = textstyle, gridExpand = TRUE
   )
-  
-  saveWorkbook(wb, glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.xlsx"), overwrite = TRUE)
-  
-  print(glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.xlsx saved successfully."))
-  
+
+  setColWidths(wb, sheet = "field_descriptions", cols = 1, widths = 27.29)
+  setColWidths(wb, sheet = "field_descriptions", cols = 2, widths = 236.14)
+
+  saveWorkbook(wb, file_name, overwrite = TRUE)
+
+  print(glue::glue("{file_name} saved successfully."))
+
   # For a more accessible document, output csv, but if used in Excel, some GENIDs will be
   # interpreted as dates and leading zeros will be removed causing issues.
   write_excel_csv(epa_eia_crosswalk,
-                  glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.csv"),
+                  file_name_csv,
                   col_names = TRUE,
                   na = ""
   )
-  
-  print(glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.csv saved successfully."))
+
+  print(glue::glue("{file_name_csv} saved successfully."))
 }
