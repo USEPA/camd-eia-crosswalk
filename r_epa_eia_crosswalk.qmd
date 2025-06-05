@@ -17,7 +17,7 @@ params:
   earliest_retirement_year: "2010"
   include_FRS: false
   include_NEEDS: false
-  output_agg: "unit"
+  output_agg: "plant"
   unmatch_only: false
 project: 
   execute_dir: project
@@ -246,18 +246,44 @@ Look for matches on the modified EPA and EIA unit identifiers between CAMD and E
 #| label: match-crosswalk-data 
 #| file: "scripts/match_crosswalk.R" 
 #| echo: false
-
-print(generator_match_summary)
-
-print(boiler_match_summary)
 ```
+
+```{r}
+#| label: generator-match-table
+#| echo: false
+
+generator_match_table <- generator_match_summary %>%
+                         gt::gt() %>%
+                         gt::tab_style(
+                              style = cell_text(size = 14, weight = "bold"),
+                              locations = cells_column_labels()) %>%
+                         gt::tab_caption(caption = "Generator Match Summary")
+
+generator_match_table
+```
+
+```{r}
+#| label: boiler-match-table
+#| echo: false
+
+boiler_match_table <- boiler_match_summary %>%
+                      gt::gt() %>%
+                      gt::tab_style(
+                            style = cell_text(size = 14, weight = "bold"),
+                            locations = cells_column_labels()) %>%
+                      gt::tab_caption(caption = "Boiler Match Summary")
+
+
+boiler_match_table
+```
+
 
 ### Match Summary
 
 `epa_distinct`/`epa_duplicates` are found according to unique combinations of EPA plant, unit, and generator identifiers. Duplicates can either be introduced from the automated crosswalk operations or from manual matches. Duplicates can also occur in the rare cases where CAMD has fewer identifiers for the same unit/generator than EIA (e.g. `epa_plant_id` = 52151, `epa_unit_id` = 001, `eia_plant_id` = 52151, `eia_boiler_id` = PB1,RF1,PB2,RF2).
 
 ```{r}
-#| echo: TRUE
+#| echo: false
 #| label: crosswalk-summary-table
 
 # Create table of counts of matches for each step
@@ -276,7 +302,12 @@ crosswalk_summary_table <-
     epa_excluded = epa_eia_crosswalk %>%
       filter(str_detect(match_type_gen, "Excluded", negate = F) | str_detect(match_type_boiler, "Excluded", negate = F)) %>%
       nrow()
-  )
+  ) %>%
+  gt::gt() %>%
+  gt::tab_style(
+      style = cell_text(size = 14, weight = "bold"),
+      locations = cells_column_labels()) %>%
+  gt::tab_caption(caption = "Crosswalk Summary")
 
 crosswalk_summary_table
 ```

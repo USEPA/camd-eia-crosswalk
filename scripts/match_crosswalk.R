@@ -192,9 +192,7 @@ generator_match_summary <- epa_eia_gen_crosswalk_5 %>%
     unmatched = nrow(epa_unit) - cumulative_count + cumulative_duplicates
   )
 
-print(generator_match_summary)
-
-## Step 2: Match EPA to EIA 6_1_EnviroAssoc (boilers and generators) data set
+## Step 2: Match EPA to EIA 6_1_EnviroAssoc (boilers and generators) data set ----
 
 boiler_step_string <- "6_1_EnviroAssoc (boilers and generators) match on plant, boiler, and gen IDs Step 2"
 
@@ -268,9 +266,7 @@ boiler_match_summary <- epa_eia_boiler_crosswalk_5 %>%
     unmatched = nrow(epa_unit) - cumulative_count + cumulative_duplicates
   )
 
-print(boiler_match_summary)
-
-## Step 3: Join data sets from Step 2 and Step 3 to have a set of comprehensive matches that have all EPA identifiers and all EIA identifiers where they exist.
+## Step 3: Join data sets from Step 2 and Step 3 to have a set of comprehensive matches that have all EPA identifiers and all EIA identifiers where they exist. ----
 epa_eia_crosswalk <- epa_eia_gen_crosswalk_5 %>%
   # We needed the manual matches/unmatched in the gen/boiler crosswalks to keep them out of the process,
   # but now we need to pull them out to join the two crosswalks, since their inclusion creates duplicates in this
@@ -313,7 +309,7 @@ epa_eia_crosswalk <- epa_eia_gen_crosswalk_5 %>%
       eia_generator_modified,
       eia_by = c("eia_plant_id", "eia_generator_id")
     ) %>%
-      # Set the MATCH_TYPE_GEN/BOILER to the MATCH_TYPE from get_manual_matches
+      # Set the match_type_gen/boiler to the match_type from get_manual_matches
       mutate(
         match_type_gen = match_type,
         match_type_boiler = match_type,
@@ -362,7 +358,7 @@ epa_eia_crosswalk_2 <- epa_eia_crosswalk %>%
   select(final_crosswalk_cols) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
 
-## Get unmatched after all steps
+## Get unmatched after all steps ----
 epa_unmatched <- get_epa_unmatched(epa_unit, epa_eia_crosswalk_2) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
 eia_gen_unmatched <- get_unmatched(eia_generator_modified, epa_eia_crosswalk_2, by = c("eia_plant_id", "eia_generator_id"))
@@ -374,7 +370,7 @@ epa_unmatched_2 <- epa_unmatched %>%
     match_type_boiler = "EPA Unmatched"
   )
 
-# Bind the unmatched EPA units to the result 
+# Bind the unmatched EPA units to the result  
 # flag: change this to be editable in params to include or not include outputs
 epa_eia_crosswalk_3 <- epa_eia_crosswalk_2 %>%
   bind_rows(epa_unmatched_2 %>% select(any_of(final_crosswalk_cols))) %>%

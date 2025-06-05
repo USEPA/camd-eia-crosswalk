@@ -56,14 +56,14 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, unmatch_only = FALSE)
   agg_groupby_cols <-
     c("epa_state",
       "epa_facility_name",
-      "epa_plant_id",
-      "epa_latitude",
-      "epa_longitude",
+      "epa_plant_id")
+      # "epa_latitude",
+      # "epa_longitude",
       # "eia_state",
       # "eia_plant_name",
       # "eia_plant_id",
-      "eia_latitude",
-      "eia_longitude")
+      # "eia_latitude",
+      # "eia_longitude")
   
   if (agg_level == "plant") {
     agg_groupby_cols <-
@@ -86,10 +86,14 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, unmatch_only = FALSE)
   agg_concat_cols <-
     c("epa_status",
       "epa_status_date",
+      "epa_latitude",
+      "epa_longitude",
       "epa_fuel_type",
       "epa_retire_year",
       "eia_state",
       "eia_plant_name",
+      "eia_latitude",
+      "eia_longitude",
       "eia_fuel_type",
       "eia_retire_year",
       "eia_plant_id",
@@ -135,9 +139,18 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, unmatch_only = FALSE)
                        mutate(sequence_number = row_number()) %>%
                        select(field_col_names)
   
+  if (agg_level == "plant") {
+    epa_eia_crosswalk <- epa_eia_crosswalk %>%
+                         select(epa_plant_id,
+                                epa_facility_name, 
+                                eia_plant_id,
+                                eia_plant_name,
+                                contains("match_type"))
+  }
+  
   if (unmatch_only) {
     epa_eia_crosswalk <- epa_eia_crosswalk %>%
-                         filter(match_type_gen == "EPA Unmatched" | match_type_boiler == "EPA Unmatched")
+                         filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
     file_name <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}_unmatched.xlsx")
     file_name_csv <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}_unmatched.csv")
   } else {
