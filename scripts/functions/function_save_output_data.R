@@ -34,11 +34,11 @@ save_output_data <- function(data, output_folder_path, filename){
 
   
   # create save directories if they don't exist
-  if(dir.exists(glue::glue("{output_folder_path}"))) {
-    print(glue::glue("Folder {output_folder_path} already exists."))
-  } else {
-    dir.create(glue::glue("{output_folder_path}"))
-  }
+  # if(dir.exists(glue::glue("{output_folder_path}"))) {
+  #   print(glue::glue("Folder {output_folder_path} already exists."))
+  # } else {
+  #   dir.create(glue::glue("{output_folder_path}"))
+  # }
   
   if(dir.exists(glue::glue("{output_folder_path}/{params$crosswalk_year}"))) {
     print(glue::glue("Folder {output_folder_path}/{params$crosswalk_year} already exists."))

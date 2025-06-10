@@ -130,14 +130,16 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, unmatch_only = FALSE)
     c("epa_nameplate_capacity",
       "eia_nameplate_capacity")
   
-  
-  epa_eia_crosswalk <- epa_eia_crosswalk %>%
-                       group_by(pick(all_of(agg_groupby_cols))) %>%
-                       summarize(across(all_of(agg_concat_cols), ~paste(unique(.x), collapse = ", ")),
-                              across(all_of(agg_sum_cols), ~sum(.x, na.rm = TRUE))) %>%
-                       ungroup() %>%
-                       mutate(sequence_number = row_number()) %>%
-                       select(field_col_names)
+  if (agg_level != "plant") {
+    epa_eia_crosswalk <- epa_eia_crosswalk %>%
+      group_by(pick(all_of(agg_groupby_cols))) %>%
+      summarize(across(all_of(agg_concat_cols), ~paste(unique(.x), collapse = ", ")),
+                across(all_of(agg_sum_cols), ~sum(.x, na.rm = TRUE))) %>%
+      ungroup() %>%
+      mutate(sequence_number = row_number()) %>%
+      select(field_col_names)
+  }
+
   
   if (agg_level == "plant") {
     epa_eia_crosswalk <- epa_eia_crosswalk %>%
@@ -145,12 +147,20 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, unmatch_only = FALSE)
                                 epa_facility_name, 
                                 eia_plant_id,
                                 eia_plant_name,
-                                contains("match_type"))
+                                plant_id_change_flag) %>%
+                         distinct()
   }
   
   if (unmatch_only) {
-    epa_eia_crosswalk <- epa_eia_crosswalk %>%
-                         filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
+    if (agg_level != "plant") {
+      epa_eia_crosswalk <- epa_eia_crosswalk %>%
+        filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
+    } else {
+      epa_eia_crosswalk <- epa_eia_crosswalk %>%
+                           filter(plant_id_change_flag != "0") %>%
+                           select(-plant_id_change_flag)
+    }
+
     file_name <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}_unmatched.xlsx")
     file_name_csv <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}_unmatched.csv")
   } else {

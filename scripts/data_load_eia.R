@@ -35,19 +35,40 @@ if (!exists("params")) {
 }
 
 eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{params$crosswalk_year}.zip")
+eia_data_file2 <- str_glue("https://www.eia.gov/electricity/data/eia860/xls/eia860{params$crosswalk_year}.zip")
+
+# check if EIA folder exists
+if(dir.exists(glue::glue("data/raw_data/eia/{params$crosswalk_year}"))) {
+  print(glue::glue("Folder eia/{params$crosswalk_year} already exists."))
+} else {
+  dir.create(glue::glue("data/raw_data/eia/{params$crosswalk_year}"))
+}
+
 
 # Import plant, generator, and boiler (EnviroAssoc) data from EIA-860 using data year specified in eia_860_year
 download.file(
   eia_data_file,
-  str_glue("data/eia860{params$crosswalk_year}.zip")
+  str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip")
 )
 
-unzip(zipfile = str_glue("data/eia860{params$crosswalk_year}.zip"), exdir = "data")
+tryCatch({
+  unzip(zipfile = str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"), 
+        exdir = str_glue("data/raw_data/eia/{params$crosswalk_year}"))
+  }, warning = function(w) {
+    
+    download.file(
+      eia_data_file2,
+      str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip")
+    )
+    unzip(zipfile = str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"), 
+          exdir = str_glue("data/raw_data/eia/{params$crosswalk_year}"))
+  })
+
 
 # Get plant location data
 eia_plant <-
   read_excel(
-    str_glue("data/2___Plant_Y{params$crosswalk_year}.xlsx"),
+    str_glue("data/raw_data/eia/{params$crosswalk_year}/2___Plant_Y{params$crosswalk_year}.xlsx"),
     sheet = "Plant",
     range = cell_cols("C:K"),
     skip = 1,
@@ -62,7 +83,7 @@ eia_plant <-
 # Get boiler ID
 eia_boiler <-
   read_excel(
-    str_glue("data/6_1_EnviroAssoc_Y{params$crosswalk_year}.xlsx"),
+    str_glue("data/raw_data/eia/{params$crosswalk_year}/6_1_EnviroAssoc_Y{params$crosswalk_year}.xlsx"),
     sheet = "Boiler Generator",
     range = cell_cols("C:F"),
     skip = 1,
@@ -80,7 +101,7 @@ eia_boiler <-
 # Create a consolidated list of all units (retired and operating)
 eia_gen_opr <- # Operating units
   read_excel(
-    str_glue("data/3_1_Generator_Y{params$crosswalk_year}.xlsx"),
+    str_glue("data/raw_data/eia/{params$crosswalk_year}/3_1_Generator_Y{params$crosswalk_year}.xlsx"),
     sheet = "Operable",
     range = cell_cols("C:AH"),
     skip = 1,
@@ -91,7 +112,7 @@ eia_gen_opr <- # Operating units
 
 eia_gen_ret <- # Retired units
   read_excel(
-    str_glue("data/3_1_Generator_Y{params$crosswalk_year}.xlsx"),
+    str_glue("data/raw_data/eia/{params$crosswalk_year}/3_1_Generator_Y{params$crosswalk_year}.xlsx"),
     sheet = "Retired and Canceled",
     range = cell_cols("C:AH"),
     skip = 1,
