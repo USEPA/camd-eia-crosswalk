@@ -9,7 +9,7 @@
 ##
 ## -------------------------------
 
-output_crosswalk <- function(epa_eia_crosswalk, agg_level, unmatch_only = FALSE) {
+output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
   
   field_description_labels <-
     c("sequence_number"             = "Row number assigned to each observation. Included for purposes of sorting to original order.",

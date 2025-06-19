@@ -23,7 +23,7 @@ epa_eia_crosswalk_4 <- epa_eia_crosswalk_3 %>%
 # plant ver - select epa_plant_id epa_plant_name, eia_plant_id eia_plant_name
 
 
-output_crosswalk(epa_eia_crosswalk_4, agg_level = params$output_agg, unmatch_only = params$unmatch_only)
+output_crosswalk(epa_eia_crosswalk_4, agg_level = params$output_agg, diffs_only = params$diffs_only)
 
 
 
