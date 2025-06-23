@@ -151,7 +151,7 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
                          distinct()
   }
   
-  if (unmatch_only) {
+  if (diffs_only) {
     if (agg_level != "plant") {
       epa_eia_crosswalk <- epa_eia_crosswalk %>%
         filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
