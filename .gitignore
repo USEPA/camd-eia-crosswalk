@@ -14,3 +14,6 @@
 !epa_eia_crosswalk.xlsx
 !field_descriptions.csv
 .Rproj.user
+api_keys/epa_api_key.txt
+data/outputs/
+data/raw_data/
