@@ -28,6 +28,10 @@ get_frs_id_sys <- function(plant_id, sys) {
     str_glue(
       "https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities?pgm_sys_acrnm={sys}&pgm_sys_id={plant_id}&output=JSON"
     )
+  
+  frs_endpoint <-
+    str_glue("https://frsquerypre-api.epa.gov/facilityiptquery/v1/FRS/QueryProgramFacility?programSystemAcronym={sys}&programSystemId={plant_id}&output=JSON")
+  
   response <- GET(frs_endpoint)
   text_json <-
     str_replace_all(suppressMessages(content(response, as = "text")), "[\\r\\n\\t]+", "")
@@ -40,12 +44,23 @@ get_frs_id_sys <- function(plant_id, sys) {
   return(as.numeric(frs_id))
 }
 
+# get frs ids sheet
+# download.file(url, destfile, method = "auto")
+# https://ordsext.epa.gov/FLA/www3/state_files/national_combined.zip
+# unzip and open up NATIONAL_ORGANIZATIONAL_FILE (using unzip)
+# filter to EIA-860, CAMDBS, EGRID
+# figure out how to only keep one ... delete the rest?
+# filter and reduce memory usage
+ 
+
+
+
 if(!file.exists("data/FRS_ids.csv")) {
   message(str_glue("Obtaining FRS IDs. This may take several minutes.\n{timestamp(quiet=TRUE)}"))
   system.time(
-    frs <- camd_eia_crosswalk %>%
-      distinct(CAMD_PLANT_ID) %>%
-      mutate(FRS_ID = map_dbl(CAMD_PLANT_ID, get_frs_id)) %>%
+    frs <- epa_eia_crosswalk %>%
+      distinct(epa_plant_id) %>%
+      mutate(frs_id = purrr::map_dbl(epa_plant_id, get_frs_id)) %>%
       write_csv("data/FRS_ids.csv")
   )
   message(str_glue("{timestamp(quiet=TRUE)}\nFinished obtaining FRS IDs. Writing to data/FRS_ids.csv"))
