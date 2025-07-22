@@ -379,3 +379,8 @@ epa_eia_crosswalk_3 <- epa_eia_crosswalk_2 %>%
     sequence_number = row_number(),
     .before= epa_state
   )
+
+# Update location based fields
+test <- epa_eia_crosswalk_3 %>%
+        filter(is.na(epa_state))
+

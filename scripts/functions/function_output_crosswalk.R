@@ -11,6 +11,8 @@
 
 output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
   
+  ## create field_descriptions
+  # data labels
   field_description_labels <-
     c("sequence_number"             = "Row number assigned to each observation. Included for purposes of sorting to original order.",
       "epa_state"                   = "The state where the facility is located in EPA's data.",
@@ -49,9 +51,12 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
   field_col_names <- names(field_description_labels)
   field_col_desc <- unname(field_description_labels)
   
+  # create dataframe using labels
   field_desc_df <- data.frame("Column Name" = field_col_names, "Description" = field_col_desc)
   colnames(field_desc_df) <- c("Column Name", "Description")
   
+  
+  ## aggregate crosswalk data
   # define which columns to groupby by aggregation level
   agg_groupby_cols <-
     c("epa_state",
@@ -65,6 +70,7 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
       # "eia_latitude",
       # "eia_longitude")
   
+  # depending on which temporal level, use certain columns
   if (agg_level == "plant") {
     agg_groupby_cols <-
       agg_groupby_cols
@@ -151,13 +157,15 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
                          distinct()
   }
   
+  
+  ## filter for only 
   if (diffs_only) {
     if (agg_level != "plant") {
       epa_eia_crosswalk <- epa_eia_crosswalk %>%
         filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
     } else {
       epa_eia_crosswalk <- epa_eia_crosswalk %>%
-                           filter(plant_id_change_flag != "0") %>%
+                           filter(plant_id_change_flag != "0" | eia_plant_id != epa_plant_id) %>%
                            select(-plant_id_change_flag)
     }
 
