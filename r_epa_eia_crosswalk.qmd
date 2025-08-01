@@ -179,7 +179,7 @@ This section imports the unit and generator data from the EPA CAM API. **An EPA 
 
 ### Import EIA data
 
-This section downloads and imports data from EIA-860 for the year specified in `params`. We automated the download and unzip steps this data from the EIA site in `scripts/data_load_eia.R`. 
+This section downloads and imports data from EIA-860 for the year specified in `params`. These data are automatically unzipped from the EIA site in `scripts/data_load_eia.R`. 
 
 ```{r}
 #| label: data-load-eia 
