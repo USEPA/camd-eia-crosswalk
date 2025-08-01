@@ -1,13 +1,15 @@
 ## -------------------------------
 ##
-## Data load CAMPD
+## Data load from EPA CAM API
 ## 
 ## Purpose: 
 ## 
-## This section imports the unit and generator data from the CAMPD API. 
-## A CAMPD API key is required and can be obtained easily by signing up at the 
-## (https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api#signup). # fix this
-## 
+## This section imports the unit and generator data from the CAM API. 
+## A CAM API key is required and can be obtained easily by signing up at the 
+## (https://www.epa.gov/power-sector/cam-api-portal#/api-key-signup). 
+##
+## Authors: 
+##    Madeline Zhang, Abt Global
 ##
 ## -------------------------------
 

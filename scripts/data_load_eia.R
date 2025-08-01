@@ -10,7 +10,8 @@
 ## The files used in this analysis are "3_1_Generator_Y{year}.xlsx" and "6_1_EnviroAssoc_Y{year}.xlsx", 
 ## with "2___Plant_Y{year}.xlsx" to get lat/long.
 ## 
-##
+## Authors: 
+##    Madeline Zhang, Abt Global
 ## -------------------------------
 
 # Load in libraries

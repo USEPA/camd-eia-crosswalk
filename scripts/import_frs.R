@@ -1,16 +1,19 @@
 ## -------------------------------
 ##
-## Import FRS
+## Import FRS data 
 ## 
 ## Purpose: 
 ## 
 ## This file imports FRS data to include with the crosswalk
 ## 
+## Authors: 
+##    Madeline Zhang, Abt Global
 ##
 ## -------------------------------
 
-
 # FRS API functions
+
+# this function returns FRS IDs based on specified program IDs
 get_frs_id <- function(plant_id) {
   # The FRS database has the most information based on the EIA-860
   systems <- c("EIA-860", "CAMDBS", "EGRID")
@@ -23,6 +26,7 @@ get_frs_id <- function(plant_id) {
   return(NA)
 }
 
+# this function downloads FRS data from their API
 get_frs_id_sys <- function(plant_id, sys) {
   frs_endpoint <-
     str_glue(
@@ -49,12 +53,11 @@ get_frs_id_sys <- function(plant_id, sys) {
 # https://ordsext.epa.gov/FLA/www3/state_files/national_combined.zip
 # unzip and open up NATIONAL_ORGANIZATIONAL_FILE (using unzip)
 # filter to EIA-860, CAMDBS, EGRID
-# figure out how to only keep one ... delete the rest?
+
+# TG (8/1/2025): flagging for this to be clarified and resolved
+# figure out how to only keep one ... delete the rest? 
 # filter and reduce memory usage
  
-
-
-
 if(!file.exists("data/FRS_ids.csv")) {
   message(str_glue("Obtaining FRS IDs. This may take several minutes.\n{timestamp(quiet=TRUE)}"))
   system.time(

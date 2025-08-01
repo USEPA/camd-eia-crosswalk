@@ -6,16 +6,15 @@
 ## 
 ## This file imports NEEDS data to include with the crosswalk
 ## 
-##
+## Authors: 
+##    Madeline Zhang, Abt Global
+## 
 ## -------------------------------
-
-# Get working directory for file path
-wd <- getwd()
 
 # Load in NEEDS data
 needs <-
   read_excel(
-    str_glue("{wd}/data/needs_v6_november_2018_reference_case_0.xlsx"),
+    str_glue("data/needs_v6_november_2018_reference_case_0.xlsx"),
     sheet = "NEEDS v6_Active",
     range = cell_cols("B:E")
   ) %>%
