@@ -21,6 +21,7 @@ library(purrr) # Use of partial and map functions
 library(janitor)
 
 # Load necessary functions
+source("scripts/functions/function_check_params.R")
 source("scripts/functions/function_match_crosswalk.R")
 source("scripts/functions/function_modify_crosswalk.R")
 
@@ -52,6 +53,7 @@ unit_manual_matches <-
     col_types = manual_match_cols,
     trim_ws = TRUE
   ) %>% clean_names()
+
 unit_manual_excluded <-
   read_excel(
     "manual_matches.xlsx",
@@ -85,13 +87,15 @@ plant_id_replacements <- plant_id_replacements %>% deframe()
 # The !!! operator forces-splice the named character vector of plant code corrections
 # meaning that they each become one argument to the recode function instead of one character vector as an arugment
 # i.e. recode(c(a="1", b="2", c="3")) becomes recode(a="1", b="2", c="3")
-eia_generator <- eia_generator %>%
+eia_generator <- 
+  eia_generator %>%
   mutate(
     mod_eia_plant_id = recode(eia_plant_id, !!!plant_id_replacements),
     plant_id_change_flag = ifelse(eia_plant_id != mod_eia_plant_id, 1, 0)
   )
 
-eia_boiler <- eia_boiler %>%
+eia_boiler <- 
+  eia_boiler %>%
   mutate(
     mod_eia_plant_id = recode(eia_plant_id, !!!plant_id_replacements),
     plant_id_change_flag = ifelse(eia_plant_id != mod_eia_plant_id, 1, 0)
