@@ -10,15 +10,11 @@
 ## -------------------------------
 
 # Load libraries and functions ------
-#library(tidyverse) 
-library(lubridate) # Make working with dates easier
-library(httr) # Perform HTTP requests (in this case used to get data from FACT API)
-library(tidyjson) # Work with json objects in a tidy way. Useful for highly nested objects and "ragged" arrays and/or objects (varying lengths by document)
-library(jsonlite)
-library(readxl) # Read data from xlsx files via read_excel()
-library(openxlsx) # Create and write to formatted xlsx documents
-library(purrr) # Use of partial and map functions
-library(janitor)
+library(dplyr)
+library(tibble)
+library(stringr)
+library(readxl)
+library(purrr) 
 
 # Load necessary functions
 source("scripts/functions/function_match_crosswalk.R")
@@ -52,7 +48,7 @@ unit_manual_matches <-
     range = cell_cols("A:F"),
     col_types = manual_match_cols,
     trim_ws = TRUE
-  ) %>% clean_names()
+  ) %>% janitor::clean_names()
 
 unit_manual_excluded <-
   read_excel(
@@ -61,7 +57,7 @@ unit_manual_excluded <-
     range = cell_cols("A:C"),
     col_types = head(manual_match_cols, n = 3),
     trim_ws = TRUE
-  ) %>% clean_names()
+  ) %>% janitor::clean_names()
 
 rm(manual_match_cols)
 
@@ -77,7 +73,7 @@ plant_id_replacements <-
     col_types = egrid_crosswalk_cols,
     trim_ws = TRUE
   ) %>%
-  clean_names() %>%
+  janitor::clean_names() %>%
   select(eia_plant_id, epa_plant_id)
 
 # Turn tibble into named character vector for recode() function
@@ -278,7 +274,8 @@ boiler_match_summary <-
   )
 
 ## Step 3: Join data sets from Step 2 and Step 3 to have a set of comprehensive matches that have all EPA identifiers and all EIA identifiers where they exist. ----
-epa_eia_crosswalk <- epa_eia_gen_crosswalk_5 %>%
+epa_eia_crosswalk <- 
+  epa_eia_gen_crosswalk_5 %>%
   # We needed the manual matches/unmatched in the gen/boiler crosswalks to keep them out of the process,
   # but now we need to pull them out to join the two crosswalks, since their inclusion creates duplicates in this
   # left_join.
@@ -367,7 +364,7 @@ final_crosswalk_cols <-
 
 epa_eia_crosswalk_2 <- 
   epa_eia_crosswalk %>%
-  select(final_crosswalk_cols) %>%
+  select(any_of(final_crosswalk_cols)) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
 
 ## Get unmatched after all steps ----
