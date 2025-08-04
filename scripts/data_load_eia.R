@@ -15,7 +15,7 @@
 ## -------------------------------
 
 # Load in libraries
-library(tidyverse)
+#library(tidyverse)
 library(lubridate)
 library(httr)
 library(tidyjson)
@@ -35,6 +35,7 @@ if (!exists("params")) {
   print("Crosswalk parameters are already defined.")
 }
 
+# TG (8/1/2025): can we implement a more seamless way to check for the file path? 
 eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{params$crosswalk_year}.zip")
 eia_data_file2 <- str_glue("https://www.eia.gov/electricity/data/eia860/xls/eia860{params$crosswalk_year}.zip")
 

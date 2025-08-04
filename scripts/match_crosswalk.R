@@ -10,7 +10,7 @@
 ## -------------------------------
 
 # Load libraries and functions ------
-library(tidyverse)
+#library(tidyverse) 
 library(lubridate) # Make working with dates easier
 library(httr) # Perform HTTP requests (in this case used to get data from FACT API)
 library(tidyjson) # Work with json objects in a tidy way. Useful for highly nested objects and "ragged" arrays and/or objects (varying lengths by document)
