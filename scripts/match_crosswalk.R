@@ -105,7 +105,7 @@ rm(egrid_crosswalk_cols)
 plant_boiler_gen_match <- 
   c(
     "epa_plant_id" = "mod_eia_plant_id", 
-    "mod_epa_unit_id" = "mod_eia_boiler_id", # change from CAMD to EPA
+    "mod_epa_unit_id" = "mod_eia_boiler_id",
     "mod_epa_generator_id" = "mod_eia_generator_id"
   )
 
