@@ -5,12 +5,14 @@
 ## Purpose: 
 ## 
 ## 
-## 
+## Authors: 
+##    Madeline Zhang, Abt Global
 ##
 ## -------------------------------
 
 # Load libraries and functions ------
 library(dplyr)
+library(readr)
 library(tibble)
 library(stringr)
 library(readxl)
@@ -29,14 +31,12 @@ if (!exists("params")) {
 }
 
 # Load data -------
-eia_raw <- readRDS(glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia_raw.RDS"))
-epa_raw <- readRDS(glue::glue("data/raw_data/epa/{params$crosswalk_year}/epa_raw.RDS"))
+eia <- read_rds(glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia_raw.RDS"))
+epa_unit <- read_rds(glue::glue("data/raw_data/epa/{params$crosswalk_year}/epa_raw.RDS"))
 
 # Set up raw data 
-eia_boiler_raw <- eia_raw$boiler
-eia_generator_raw <- eia_raw$generator
-
-epa_unit <- epa_raw
+eia_boiler <- eia$boiler
+eia_generator <- eia$generator
 
 # Get manual matches and excluded EPA units from manual match file
 manual_match_cols <- c("numeric", "text", "text", "numeric", "text", "text")
@@ -84,14 +84,14 @@ plant_id_replacements <- plant_id_replacements %>% deframe()
 # meaning that they each become one argument to the recode function instead of one character vector as an arugment
 # i.e. recode(c(a="1", b="2", c="3")) becomes recode(a="1", b="2", c="3")
 eia_generator_modified <- 
-  eia_generator_raw %>%
+  eia_generator %>%
   mutate(
     mod_eia_plant_id = recode(eia_plant_id, !!!plant_id_replacements),
     plant_id_change_flag = ifelse(eia_plant_id != mod_eia_plant_id, 1, 0)
   )
 
 eia_boiler_modified <- 
-  eia_boiler_raw %>%
+  eia_boiler %>%
   mutate(
     mod_eia_plant_id = recode(eia_plant_id, !!!plant_id_replacements),
     plant_id_change_flag = ifelse(eia_plant_id != mod_eia_plant_id, 1, 0)
@@ -273,7 +273,7 @@ boiler_match_summary <-
          unmatched = nrow(epa_unit) - cumulative_count + cumulative_duplicates
   )
 
-## Step 3: Join data sets from Step 2 and Step 3 to have a set of comprehensive matches that have all EPA identifiers and all EIA identifiers where they exist. ----
+## Step 3: Join data sets from Step 1 and Step 2 to have a set of comprehensive matches that have all EPA identifiers and all EIA identifiers where they exist. ----
 epa_eia_crosswalk <- 
   epa_eia_gen_crosswalk_5 %>%
   # We needed the manual matches/unmatched in the gen/boiler crosswalks to keep them out of the process,
@@ -367,19 +367,38 @@ epa_eia_crosswalk_2 <-
   select(any_of(final_crosswalk_cols)) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
 
-## Get unmatched after all steps ----
-epa_unmatched <- 
+## Step 4: Address unmatched EPA units ----------------
+
+epa_unmatched <- # identify which EPA units do not match to EIA data 
   get_epa_unmatched(epa_unit, epa_eia_crosswalk_2) %>%
   arrange(epa_plant_id, epa_unit_id, epa_generator_id)
 
 eia_gen_unmatched <- get_unmatched(eia_generator_modified, epa_eia_crosswalk_2, by = c("eia_plant_id", "eia_generator_id"))
 eia_boiler_unmatched <- get_unmatched(eia_boiler_modified, epa_eia_crosswalk_2, by = c("eia_plant_id", "eia_boiler_id", "eia_generator_id"))
 
+# pull in EPA plants that are known to not be in EIA data from the eGRID production model
+# these units will remain unmatched, but with a known reason and will therefore not be included in future matching steps
+# this is a step performed in eGRID, these plants have been confirmed to not be in EIA data 
+
+epa_plants_not_in_eia <- 
+  read_csv("https://raw.githubusercontent.com/USEPA/egrid/refs/heads/main/data/static_tables/epa_plants_to_delete.csv") %>% 
+  janitor::clean_names() 
+
+epa_unconnected_grid <- 
+  epa_plants_not_in_eia %>% 
+  filter(str_detect(notes, "^These plants do not connect to the grid"))
+
+epa_plants_not_in_eia_other <- 
+  epa_plants_not_in_eia %>% 
+  filter(!str_detect(notes, "^These plants do not connect to the grid"))
+
 epa_unmatched_2 <- 
   epa_unmatched %>%
   mutate(
-    match_type_gen = "EPA Unmatched",
-    match_type_boiler = "EPA Unmatched"
+    match_type_gen = case_when(facility_id %in% epa_unconnected_grid$oris_code ~ "EPA Unmatched: this plant is not connected to the grid and is not in EIA data",
+                               TRUE ~ "EPA Unmatched"),
+    match_type_boiler = case_when(facility_id %in% epa_unconnected_grid$oris_code ~ "EPA Unmatched: this plant is not connected to the grid and is not in EIA data",
+                                  TRUE ~ "EPA Unmatched")
   )
 
 # Bind the unmatched EPA units to the result  
@@ -392,3 +411,4 @@ epa_eia_crosswalk_3 <-
     sequence_number = row_number(),
     .before= epa_state
   )
+  
