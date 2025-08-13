@@ -30,7 +30,10 @@ source("scripts/functions/function_check_params.R")
 # Set up API and API key ----------
 
 # Read API key from text file
-api_key <- read_lines("api_keys/epa_api_key.txt")
+if(file.exists("api_keys/epa_api_key.txt")) { 
+  api_key <- read_lines("api_keys/epa_api_key.txt")
+} else{ 
+  stop("You must provide an API key. See README with instructions in how to obtain one.")}
 
 # Set up year dimensions
 if (!exists("params")) {
@@ -39,14 +42,10 @@ if (!exists("params")) {
   print("Crosswalk parameters are already defined.")
 }
 
-if (api_key == "YOUR_API_KEY") { # flag: default to this in epa_api_key.txt file
-  stop("You must provide a EPA API key")
-}
-
 # Call API using API key
 response <-
   GET(str_glue(
-    "https://api.epa.gov/easey/camd-services/bulk-files?API_KEY={api_key}" # EPA/CAMPD API 
+    "https://api.epa.gov/easey/camd-services/bulk-files?API_KEY={api_key}" # EPA/CAM API 
   ))
 
 # If something is wrong with the request, fail gracefully
