@@ -109,20 +109,6 @@ emissions_files <-
 emissions_data <- 
   purrr::map_df(emissions_files$file_path, ~ read_csv(.x))
 
-# identify columns to sum when cleaning emissions data
-cols_to_sum <- 
-  c("operating_time_count",
-    "sum_of_the_operating_time",
-    "gross_load_mwh",
-    "steam_load_1000_lb",
-    "so2_mass_short_tons",
-    "so2_rate_lbs_mmbtu",
-    "co2_mass_short_tons",
-    "co2_rate_short_tons_mmbtu",
-    "nox_mass_short_tons",
-    "nox_rate_lbs_mmbtu",
-    "heat_input_mmbtu")
-
 # creating map to recode numeric monthly values to names for emissions data
 month_name_map <- 
   tolower(month.name) %>% 
@@ -139,24 +125,27 @@ emissions_data_clean <-
   mutate(year = as.character(year(date)), # extracting year from date
          month = as.character(month(date)), # extracting month from date
          month = recode(month, !!!month_name_map)) %>% # updating month to name
-  select(-date) %>%
+  # select heat input and unit type alongside unit descriptors
+  select(year, month, facility_id, unit_id, primary_fuel_type, heat_input_mmbtu, unit_type) %>%
   mutate(across(where(is.character), ~ str_replace_all(.x, "\\|", ","))) %>% # SB 6/4/2024: Temporary fix for issue in API where there are a mix of pipes and commas in some character values
-  group_by(pick(-c(all_of(cols_to_sum)))) %>% 
-  summarize(across(all_of(cols_to_sum), ~ sum(.x, na.rm = TRUE))) %>% # aggregating to monthly values first
+  # group by and sum monthly heat input
+  group_by(pick(-c(heat_input_mmbtu))) %>%
+  summarize(heat_input_mmbtu = sum(heat_input_mmbtu, na.rm = TRUE)) %>% # aggregating to monthly values first aggregating to monthly values first
   ungroup() %>% 
-  group_by(facility_id, unit_id, primary_fuel_type, unit_type) %>% 
+  # group by and sum annual and ozone season heat input
+group_by(facility_id, unit_id, primary_fuel_type, unit_type) %>% 
   mutate(reporting_months = paste(month, collapse = ", "), # creating column with list of reporting months 
          reporting_frequency = if_else(grepl("january|february|march|october|november|december", # filtering out non-ozone season reporting months, excluding april
                                              reporting_months), "Q", "OS")) %>% # assigning reporting frequency 
-  group_by(pick(-all_of(cols_to_sum), -c(month, reporting_months, reporting_frequency))) %>% 
-  mutate(across(all_of(cols_to_sum), ~ sum(.x, na.rm = TRUE), .names = "{.col}_annual"), # calculating annual emissions
-         across(all_of(cols_to_sum), ~ sum(.x[month %in% ozone_months], na.rm = TRUE), .names = "{.col}_ozone")) %>% # now calculating ozone month emissions
+  group_by(pick(-c(month, heat_input_mmbtu, reporting_months, reporting_frequency))) %>% 
+  mutate(heat_input_mmbtu_annual = sum(heat_input_mmbtu, na.rm = TRUE), # calculating annual emissions 
+         heat_input_mmbtu_ozone = sum(heat_input_mmbtu[month %in% ozone_months], na.rm = TRUE)) %>% # now calculating ozone month emissions
   select(-month) %>% # removing month so distinct() will aggregate to unit level
-  select(-all_of(cols_to_sum), reporting_months, reporting_frequency) %>% 
+  select(-heat_input_mmbtu, reporting_months, reporting_frequency) %>% 
   rename_with(.cols = contains("_annual"), # removing annual suffix
               .fn = ~ str_remove(.x, "_annual")) %>% 
   ungroup() %>% 
-  distinct() # removing duplicate rows that aren't needed after ozone calculation
+  distinct() #removing duplicate rows that aren't needed after ozone calculation
 
 ## Combine EPA data together -----
 epa_data_combined <- 
@@ -165,7 +154,6 @@ epa_data_combined <-
             by = c("facility_id", "unit_id", "primary_fuel_type")) %>% 
   coalesce_join_vars() %>% 
   arrange(facility_id, unit_id)
-
 
 # Clean up
 rm(epa_json)
