@@ -13,7 +13,7 @@
 ##
 ## -------------------------------
 
-# Load in libraries
+# Load libraries -----
 library(tidyverse)
 library(lubridate)
 library(httr)
@@ -22,53 +22,66 @@ library(jsonlite)
 library(readxl)
 library(openxlsx)
 library(purrr)
+library(stringr)
 
-# Load necessary functions
+# Load necessary functions -----
 source("scripts/functions/function_save_output_data.R")
 source("scripts/functions/function_check_params.R")
 
-# Set up year dimensions
+# Set up year dimensions -----
 if (!exists("params")) {
   params <- check_params()
 } else {
   print("Crosswalk parameters are already defined.")
 }
 
-eia_data_file <- str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{params$crosswalk_year}.zip")
-eia_data_file2 <- str_glue("https://www.eia.gov/electricity/data/eia860/xls/eia860{params$crosswalk_year}.zip")
+# Define file download locations for EIA forms ----
+url <- c("860" = str_glue("https://www.eia.gov/electricity/data/eia860/archive/xls/eia860{params$crosswalk_year}.zip"),
+         "923" = str_glue("https://www.eia.gov/electricity/data/eia923/archive/xls/f923_{params$crosswalk_year}.zip"))
 
-# check if EIA folder exists
-if(dir.exists(glue::glue("data/raw_data/eia/{params$crosswalk_year}"))) {
-  print(glue::glue("Folder eia/{params$crosswalk_year} already exists."))
-} else {
-  dir.create(glue::glue("data/raw_data/eia/{params$crosswalk_year}"))
+# Download EIA Files ------
+forms <- c("860", "923")
+for (form in forms) {
+  
+  # set data file names and locations
+  data_file <- url[[form]]
+  data_file_try2 <- stringr::str_replace(data_file, "/archive", "")
+  data_destination <- glue::glue("data/raw_data/eia/{params$crosswalk_year}/{form}/")
+  data_path <- paste0(data_destination,glue::glue("eia{form}{params$crosswalk_year}.zip"))
+
+  # check if EIA form folder exists
+  if(dir.exists(data_destination)) {
+    print(glue::glue("Folder {data_destination} already exists."))
+  } else {
+    dir.create(data_destination, recursive = TRUE)
+  }
+  
+  # download file .zip file
+  download.file(data_file, data_path)
+  
+  # unzip .zip file
+  tryCatch({
+    
+    # try to unzip downloaded file
+    unzip(zipfile = data_path, exdir = data_destination)
+    
+  }, warning = function(w) {
+    
+    # if warning exists, download backup url and unzip
+    download.file(data_file_try2, data_path)
+    unzip(zipfile = data_path, exdir = data_destination)
+  })
 }
 
 
-# Import plant, generator, and boiler (EnviroAssoc) data from EIA-860 using data year specified in eia_860_year
-download.file(
-  eia_data_file,
-  str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip")
-)
+# Get EIA-860 Data -----
 
-tryCatch({
-  unzip(zipfile = str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"), 
-        exdir = str_glue("data/raw_data/eia/{params$crosswalk_year}"))
-  }, warning = function(w) {
-    
-    download.file(
-      eia_data_file2,
-      str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip")
-    )
-    unzip(zipfile = str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"), 
-          exdir = str_glue("data/raw_data/eia/{params$crosswalk_year}"))
-  })
-
+dir_860 <- str_glue("data/raw_data/eia/{params$crosswalk_year}/860/")
 
 # Get plant location data
 eia_plant <-
   read_excel(
-    str_glue("data/raw_data/eia/{params$crosswalk_year}/2___Plant_Y{params$crosswalk_year}.xlsx"),
+    str_glue("{dir_860}2___Plant_Y{params$crosswalk_year}.xlsx"),
     sheet = "Plant",
     range = cell_cols("C:K"),
     skip = 1,
@@ -83,7 +96,7 @@ eia_plant <-
 # Get boiler ID
 eia_boiler <-
   read_excel(
-    str_glue("data/raw_data/eia/{params$crosswalk_year}/6_1_EnviroAssoc_Y{params$crosswalk_year}.xlsx"),
+    str_glue("{dir_860}6_1_EnviroAssoc_Y{params$crosswalk_year}.xlsx"),
     sheet = "Boiler Generator",
     range = cell_cols("C:F"),
     skip = 1,
@@ -101,7 +114,7 @@ eia_boiler <-
 # Create a consolidated list of all units (retired and operating)
 eia_gen_opr <- # Operating units
   read_excel(
-    str_glue("data/raw_data/eia/{params$crosswalk_year}/3_1_Generator_Y{params$crosswalk_year}.xlsx"),
+    str_glue("{dir_860}3_1_Generator_Y{params$crosswalk_year}.xlsx"),
     sheet = "Operable",
     range = cell_cols("C:AH"),
     skip = 1,
@@ -112,7 +125,7 @@ eia_gen_opr <- # Operating units
 
 eia_gen_ret <- # Retired units
   read_excel(
-    str_glue("data/raw_data/eia/{params$crosswalk_year}/3_1_Generator_Y{params$crosswalk_year}.xlsx"),
+    str_glue("{dir_860}3_1_Generator_Y{params$crosswalk_year}.xlsx"),
     sheet = "Retired and Canceled",
     range = cell_cols("C:AH"),
     skip = 1,
@@ -138,7 +151,7 @@ eia_generator <- rbind(eia_gen_opr, eia_gen_ret) %>%
   filter(!(eia_unit_type %in% c("BA", "CE", "CP", "FC", "FW", "HA", "HY", "PS", "PV", "WS", "WT")))
 
 
-# Add lat and long
+# Add lat and long 
 eia_generator <- eia_generator %>%
   inner_join(eia_plant, by = c("eia_plant_id"))
 
@@ -147,11 +160,12 @@ rm(eia_gen_opr)
 rm(eia_gen_ret)
 rm(eia_plant)
 
-# Creating list of necessary data
+
+# Creating list of necessary data -----
 eia_raw <- list(boiler = eia_boiler, 
                 generator = eia_generator)
 
-## Saving EIA data 
+# Saving EIA data -----
 eia_file_path <- "data/raw_data/eia"
 eia_file_name <- "eia_raw.RDS"
 
