@@ -119,6 +119,7 @@ facility_df <-
          epa_fuel_type = primary_fuel_type,
          epa_generator_id = generator_ids,
          mod_epa_generator_id = generator_ids,
+         epa_unit_type = unit_type_abb,
          epa_nameplate_capacity = nameplate_capacity, 
          epa_retire_year = retirement_year,
          epa_status = operating_status,
@@ -152,7 +153,7 @@ emissions_data_clean <-
   mutate(across(where(is.character), ~ str_replace_all(.x, "\\|", ","))) %>% # fix for issue in API where there are a mix of pipes and commas in some character values
   # group by and sum annual heat input
   group_by(pick(-c(heat_input_mmbtu))) %>%
-  summarize(heat_input_mmbtu = sum(heat_input_mmbtu, na.rm = TRUE)) %>%
+  summarize(epa_heat_input_mmbtu = sum(heat_input_mmbtu, na.rm = TRUE)) %>%
   ungroup() %>%
   distinct()
 
@@ -172,4 +173,4 @@ rm(response)
 epa_file_path <- "data/raw_data/epa"
 epa_file_name <- "epa_raw.RDS"
 
-save_output_data(epa_data_combined, epa_file_path, epa_file_name)
+# save_output_data(epa_data_combined, epa_file_path, epa_file_name)
