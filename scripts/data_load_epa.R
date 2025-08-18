@@ -51,6 +51,34 @@ response <-
 # If something is wrong with the request, fail gracefully
 stop_for_status(response, content(response)$error$message)
 
+# Create unit type crosswalk -----
+
+unit_abbs <- # abbreviation crosswalk for unit types 
+  c(
+    "Arch-fired boiler" = "AF",
+    "Bubbling fluidized bed boiler" = "BFB",
+    "Cyclone boiler" = "C",
+    "Cell burner boiler" = "CB",
+    "Combined cycle" = "CC",
+    "Circulating fluidized bed boiler" = "CFB",
+    "Combustion turbine" = "CT",
+    "Dry bottom wall-fired boiler" = "DB",
+    "Dry bottom turbo-fired boiler" = "DTF",
+    "Dry bottom vertically-fired boiler" = "DVF",
+    "Internal combustion engine" = "ICE",
+    "Integrated gasification combined cycle" = "IGC",
+    "Cement Kiln" = "KLN",
+    "Other boiler" = "OB",
+    "Other turbine" = "OT",
+    "Pressurized fluidized bed boiler" = "PFB",
+    "Process Heater" = "PRH",
+    "Stoker" = "S",
+    "Tangentially-fired" = "T",
+    "Wet bottom wall-fired boiler" = "WBF",
+    "Wet bottom turbo-fired boiler" = "WBT",
+    "Wet bottom vertically-fired boiler" = "WVF"
+  )
+
 ## Get facility data --------
 epa_json <- fromJSON(rawToChar(response$content))
 
@@ -74,9 +102,12 @@ facility_df <-
     nameplate_capacity_char = (str_extract_all(associated_generators_nameplate_capacity_mwe, "(?<=\\()\\d+(\\.\\d+)?(?=\\))")), # extracting nameplate capacity values
     associated_generators = purrr::map_chr(generator_ids, ~ paste(.x, collapse = ", ")), # pasting together associated generators
     nameplate_capacity = purrr::map_dbl(nameplate_capacity_char, ~ sum(as.numeric(.x), na.rm = TRUE)),
+    # update unit type format to match EIA formatting
+    unit_type = str_replace(unit_type, "\\(.*?\\)", "") %>% str_trim(), # removing notes about start dates and getting rid of extra white space
+    unit_type_abb = recode(unit_type, !!!unit_abbs), # recoding values based on lookup table
     retirement_year = ifelse(operating_status != "Operating", year(ymd(as.Date(commercial_operation_date))), 0), # switch from OPR to Operating - adjust in new version?
     year = as.character(year)) %>%  # summing nameplate capacity from associated generators) 
-  select(-"nameplate_capacity_char") %>% 
+  select(-"nameplate_capacity_char", -unit_type) %>% 
   tidyr::unnest(cols = generator_ids) %>%
   mutate(epa_plant_id = facility_id,
          epa_facility_name = facility_name,
@@ -96,6 +127,7 @@ facility_df <-
   arrange(generator_id, unit_id)
 
 ## Get emissions data -----
+
 emissions_files <-
   epa_json %>% 
   tidyr::unnest(cols = metadata) %>% 
@@ -116,12 +148,12 @@ emissions_data_clean <-
   janitor::clean_names() %>% 
   mutate(year = as.character(year(date))) %>% # extracting year from date
   # select heat input and unit type alongside unit descriptors
-  select(year, facility_id, unit_id, primary_fuel_type, heat_input_mmbtu, unit_type) %>%
-  mutate(across(where(is.character), ~ str_replace_all(.x, "\\|", ","))) %>% # SB 6/4/2024: Temporary fix for issue in API where there are a mix of pipes and commas in some character values
+  select(year, facility_id, unit_id, primary_fuel_type, heat_input_mmbtu) %>%
+  mutate(across(where(is.character), ~ str_replace_all(.x, "\\|", ","))) %>% # fix for issue in API where there are a mix of pipes and commas in some character values
   # group by and sum annual heat input
   group_by(pick(-c(heat_input_mmbtu))) %>%
   summarize(heat_input_mmbtu = sum(heat_input_mmbtu, na.rm = TRUE)) %>%
-  ungroup() %>% 
+  ungroup() %>%
   distinct()
 
 ## Combine EPA data together -----
