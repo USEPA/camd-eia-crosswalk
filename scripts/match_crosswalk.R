@@ -22,7 +22,6 @@ library(purrr)
 source("scripts/functions/function_match_crosswalk.R")
 source("scripts/functions/function_modify_crosswalk.R")
 source("scripts/functions/function_check_params.R")
-source("scripts/functions/function_save_output_data.R")
 
 # Set up year dimensions
 if (!exists("params")) {

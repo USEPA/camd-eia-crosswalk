@@ -1,27 +1,26 @@
 ## -------------------------------
 ##
-## Save output data
+## Save data
 ## 
 ## Purpose: 
 ## 
-## This function saves RDS output datasets in the output 
-## folder by first checking if directories exist and creating 
+## This function saves objects as RDS files in the specified 
+## folder and file path by first checking if directories exist and creating 
 ## them where necessary.
 ##
-## Additional notes
-##
-##      Emma Russell, Abt Global
+## Authors:
+##    Emma Russell, Abt Global
 ##
 ## -------------------------------
 
-save_output_data <- function(data, output_folder_path, filename){
+save_data <- function(data, output_folder_path, filename){
   
-  #' @name save_output_data
+  #' @name save_data
   #' 
-  #' Function to save RDS data in the output file and 
+  #' Function to save data to RDS files in the specified folder and file path,  
   #' create directories when necessary
   #' 
-  #' @param data Dataset variable name to save
+  #' @param data Object name to save
   #' @param output_folder String name of output folder to save to
   #' @param filename String name of new file being saved
   #' 
@@ -29,19 +28,12 @@ save_output_data <- function(data, output_folder_path, filename){
   #'         directory
   #'         
   #' @examples 
-  #' # Save PM2.5 plant file
-  #' save_output_data(pm_plant_formatted, "1_production_model", "pm_plant_file.RDS")
+  #' # Save EIA-860 data
+  #' save_output_data(eia_860_data, "data/raw_data/eia", "eia_860.RDS")
 
-  
   #create save directories if they don't exist
-  if(!dir.exists(glue::glue("{output_folder_path}"))) {
-    dir.create(glue::glue("{output_folder_path}"), recursive = TRUE)
-  }
-  
-  if(dir.exists(glue::glue("{output_folder_path}/{params$crosswalk_year}"))) {
-    print(glue::glue("Folder {output_folder_path}/{params$crosswalk_year} already exists."))
-  } else {
-    dir.create(glue::glue("{output_folder_path}/{params$crosswalk_year}"))
+  if(!dir.exists(glue::glue("{output_folder_path}/{params$crosswalk_year}"))) {
+    dir.create(glue::glue("{output_folder_path}/{params$crosswalk_year}"), recursive = TRUE)
   }
   
   print(glue::glue("Saving {filename} to folder {output_folder_path}/{params$crosswalk_year}"))

@@ -14,18 +14,17 @@
 ## -------------------------------
 
 # Load libraries --------
-#library(tidyverse)
 library(dplyr)
+library(readr)
+library(tidyr)
+library(stringr)
 library(lubridate)
 library(httr)
 library(tidyjson)
 library(jsonlite)
-library(readxl)
-library(openxlsx)
-library(purrr)
 
 # Load necessary functions ----------------
-source("scripts/functions/function_save_output_data.R")
+source("scripts/functions/function_save_data.R")
 source("scripts/functions/function_check_params.R")
 
 # Set parameters ------------------------
@@ -45,7 +44,7 @@ if(file.exists("api_keys/epa_api_key.txt")) {
 
 # Call API using API key
 response <-
-  GET(str_glue(
+  GET(glue::glue(
     "https://api.epa.gov/easey/camd-services/bulk-files?API_KEY={api_key}" # EPA/CAM API 
   ))
 
@@ -104,4 +103,4 @@ rm(response)
 epa_file_path <- "data/raw_data/epa"
 epa_file_name <- "epa_raw.RDS"
 
-save_output_data(facility_df, epa_file_path, epa_file_name)
+save_data(facility_df, epa_file_path, epa_file_name)

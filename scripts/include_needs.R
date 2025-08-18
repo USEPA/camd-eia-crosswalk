@@ -8,6 +8,7 @@
 ## 
 ## -------------------------------
 
+source("scripts/functions/function_check_valid_url.R")
 
 include_needs <- function(crosswalk_df) { 
   
@@ -19,6 +20,7 @@ include_needs <- function(crosswalk_df) {
   #' @returns crosswalk dataframe with NEEDS data included
   
   # Require libraries -----------------
+  
   require(dplyr)
   require(readxl)
   
@@ -31,9 +33,13 @@ include_needs <- function(crosswalk_df) {
   needs_path <- "data/raw_data/needs/needs_v6_november_2018_reference_case_0.xlsx"
   needs_url <- "https://www.epa.gov/sites/default/files/2019-10/needs_v6_november_2018_reference_case_0.xlsx"
   
-  download.file(
-    url = needs_url, 
-    destfile = needs_path)
+  if(check_valid_url(needs_url)) { 
+    download.file(
+      url = needs_url, 
+      destfile = needs_path)
+  } else { 
+    print("NEEDS data URL does not exist. Check and update the URL.")}
+  
   
   # Load in NEEDS data
   needs <-
