@@ -150,7 +150,6 @@ eia_generator <- rbind(eia_gen_opr, eia_gen_ret) %>%
   # Filter out renewable unit types https://www.epa.gov/sites/production/files/2017-01/egrid_code_lookup.xlsx
   filter(!(eia_unit_type %in% c("BA", "CE", "CP", "FC", "FW", "HA", "HY", "PS", "PV", "WS", "WT")))
 
-
 # Add lat and long 
 eia_generator <- eia_generator %>%
   inner_join(eia_plant, by = c("eia_plant_id"))
@@ -160,10 +159,76 @@ rm(eia_gen_opr)
 rm(eia_gen_ret)
 rm(eia_plant)
 
+# Get EIA-923 Data -----
+
+dir_923 <- str_glue("data/raw_data/eia/{params$crosswalk_year}/923/")
+
+## Load Schedule 2-5 Data -----
+# define list of sheets to iterate over and extract from excel file
+sheets_923 <- c("Page 1 Generation and Fuel Data", 
+                "Page 1 Puerto Rico",
+                "Page 3 Boiler Fuel Data",
+                "Page 4 Generator Data")
+
+# select Schedule 2-5 sheet
+file_name_schedule_2_3_4_5_m_12 <- grep("2_3_4_5_M_12",  list.files(dir_923), value = TRUE)
+
+# load Schedule 2-5 data from .xlsx
+sched_2_3_4_5_m_12_dfs <- 
+  purrr::map2(sheets_923, # .x, defining sheets to iterate over
+              c(5,6,5,5),   # y, adding second argument to define the number of rows to skip (differs between files)
+              ~ read_excel(paste0(dir_923, file_name_schedule_2_3_4_5_m_12), 
+                           sheet = .x,
+                           skip = .y,
+                           na = ".", # converting "." to NAs
+                           guess_max = 4000)) %>% # expanding length of rows for R to check to guess data type
+  purrr::map(., ~ .x %>% 
+               rename_with(tolower) %>% 
+               janitor::clean_names()) %>% # this lower cases and converts to snake_case
+  setNames(., janitor::make_clean_names(str_replace_all(sheets_923_1, "Page \\d+ ", ""))) %>% # This assigns cleaned sheets names name values for list of dataframes. Storing df names without Page #s
+  purrr::map_at("puerto_rico", # modifing puert0_rico tab only
+                ~ .x %>% 
+                  rename("reserved" = "reserved_10", # fixing issue of two "Reserved" columns. Need to figure out better way in case they're not 10 and 17
+                         "balancing_authority_code" = "reserved_17"))
+
+## Add Puerto Rico data to EIA-923 Generation and Fuel --------
+
+# combine generation/fuel data with puerto rico data
+gen_fuel_combined <-
+  bind_rows(sched_2_3_4_5_m_12_dfs$generation_and_fuel_data,
+            sched_2_3_4_5_m_12_dfs$puerto_rico)
+
+# creating character vector to rename selected columns in 923 files
+rename_cols_923 <- c("prime_mover" = "reported_prime_mover", 
+                     "fuel_type" = "reported_fuel_type_code")
+
+## Clean 923 data -----
+eia_923 <- c(sched_2_3_4_5_m_12_dfs,
+             "generation_and_fuel_combined" = list(gen_fuel_combined)) %>% 
+  purrr:::map(., ~ .x %>%  # standardizing column types across all dfs
+                rename(any_of(rename_cols_923)) %>% # standardizing col names to match other files
+                mutate(across(ends_with("id"), ~ as.character(.x)),
+                       across(contains(c("capacity", "generation", "netgen")), ~ as.numeric(.x)),
+                       across(starts_with(c("month", "year")), ~ as.character(.x)),
+                       across(ends_with(c("month", "year")))) %>% 
+                filter(!if_all(everything(), is.na)))
+
+# select heat data from boiler fuel data
+eia_heat <- 
+  eia_923$boiler_fuel_data %>% 
+  mutate(across( # calculating monthly unit heat input, based on corresponding consumption and mmbtu_per_unit
+    .cols = starts_with("quantity_of_fuel_consumed_"),
+    .fns = ~ . * get(str_replace(cur_column(), "quantity_of_fuel_consumed_", "mmbtu_per_unit_")), # identifies corresponding mmbtu_per_unit and multiplies by quantity column
+    .names = "heat_input_{str_replace(.col, 'quantity_of_fuel_consumed_','')}"),
+    heat_input = rowSums(pick(all_of(starts_with("heat_input"))))) %>% # getting annual heat_input, summing across all monthly heat columns
+  select(plant_id, plant_name, plant_state, prime_mover, boiler_id, fuel_type, heat_input) %>% 
+  rename_with(~ paste0("eia_", .x)) %>%
+  glimpse()
 
 # Creating list of necessary data -----
 eia_raw <- list(boiler = eia_boiler, 
-                generator = eia_generator)
+                generator = eia_generator,
+                heat_input = eia_heat)
 
 # Saving EIA data -----
 eia_file_path <- "data/raw_data/eia"
