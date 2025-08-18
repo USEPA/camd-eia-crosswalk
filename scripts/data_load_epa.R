@@ -4,7 +4,7 @@
 ## 
 ## Purpose: 
 ## 
-## This section imports the unit and generator data from the CAM API. 
+## This section imports the unit and generator data from the EPA CAM API. 
 ## A CAM API key is required and can be obtained easily by signing up at the 
 ## (https://www.epa.gov/power-sector/cam-api-portal#/api-key-signup). 
 ##
@@ -15,6 +15,7 @@
 
 # Load libraries --------
 #library(tidyverse)
+library(dplyr)
 library(lubridate)
 library(httr)
 library(tidyjson)
@@ -23,24 +24,24 @@ library(readxl)
 library(openxlsx)
 library(purrr)
 
-# Load necessary functions
+# Load necessary functions ----------------
 source("scripts/functions/function_save_output_data.R")
 source("scripts/functions/function_check_params.R")
 
-# Set up API and API key ----------
+# Set parameters ------------------------
+if (!exists("params")) {
+  params <- check_params()
+} else {
+  print("Crosswalk parameters are already defined.")
+}
+
+# Set up Query API ----------
 
 # Read API key from text file
 if(file.exists("api_keys/epa_api_key.txt")) { 
   api_key <- read_lines("api_keys/epa_api_key.txt")
 } else{ 
   stop("You must provide an API key. See README with instructions in how to obtain one.")}
-
-# Set up year dimensions
-if (!exists("params")) {
-  params <- check_params()
-} else {
-  print("Crosswalk parameters are already defined.")
-}
 
 # Call API using API key
 response <-

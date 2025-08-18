@@ -17,8 +17,8 @@ params:
   earliest_retirement_year: "2010"
   include_FRS: false
   include_NEEDS: false
-  output_agg: "plant" 
-  diffs_only: true
+  output_agg: "none" # options: "plant", "none"
+  diffs_only: false # options: true, false. If true, returns only units or plants with different IDs that have been matched using modifiers or manual match steps. 
 project: 
   execute_dir: project
 editor: visual
@@ -26,7 +26,7 @@ editor: visual
 
 # Overview
 
-This Quarto document includes all necessary scripts and documentation to create the EPA-EIA crosswalk. By rendering, it will create the EPA-EIA crosswalk for the specified parameters. 
+This Quarto document includes all necessary scripts and documentation to create the EPA-EIA crosswalk. By rendering, it will create the EPA-EIA crosswalk for the specified parameters.
 
 # Background
 
@@ -74,37 +74,16 @@ Units are matched on ORIS/modified plant code, unit/boiler ID, and generator ID.
 
 The two sets are joined on `epa_plant_id`, `epa_unit_id`, `epa_generator_id`, `eia_plant_id`, and `eia_generator_id`
 
-> Note: <br>To use this code, you will need an API key. You can request one from the [CAPD API overview](https://www.epa.gov/power-sector/cam-api-portal#/documentation).
+> Note: <br>To use this code, you will need an API key. You can request one from the [CA< API overview](https://www.epa.gov/power-sector/cam-api-portal#/documentation).
 
 # Processing
 
-## Load required packages
+## Install and load required packages
 
 ```{r}
-#| label: load-packages
-#| echo: TRUE
-
-library(tidyr) # tidyr - Help create tidy data
-
-library(stringr)  # Make working with strings easier (e.g., string_glue())
-
-library(readr)  # Read csv, txt, etc
-
-library(tibble) # Wrapper for data.frames that makes things easier (e.g. never converts strings to factors)
-
-library(lubridate) # Make working with dates easier
-
-library(httr) # Perform HTTP requests (in this case used to get data from FACT API)
-
-library(tidyjson) # Work with json objects in a tidy way. Useful for highly nested objects and "ragged" arrays and/or objects (varying lengths by document)
-
-library(jsonlite)
-
-library(readxl) # Read data from xlsx files via read_excel()
-
-library(openxlsx) # Create and write to formatted xlsx documents
-
-library(purrr) # Use of partial and map functions
+#| label: install-packages
+#| file: "scripts/install_libraries.R"
+#| echo: FALSE
 
 ```
 
@@ -112,7 +91,6 @@ library(purrr) # Use of partial and map functions
 #| label: load-qmd-packages
 #| echo: false
 
-library(docstring)
 library(dplyr)
 library(ggiraph)
 library(ggplot2)
@@ -130,6 +108,10 @@ library(stringr)
 The year of the crosswalk specified as the parameter "crosswalk_year" within the YAML of the Quarto document. When a year value needs to be specified (e.g., when pulling relevant data from the EPA API), it is done so by calling `params$crosswalk_year`.
 
 **Current year setting: `r params$crosswalk_year`**
+
+The earliest retirement year specified as the parameter "earliest_retirement_year" within the YAML of the Quarto document. Only units retired after `params$earliest_retirement_year` are included in the crosswalk dataset.
+
+**Current year setting: `r params$earliest_retirement_year`**
 
 ## Load all helper functions
 
@@ -179,7 +161,7 @@ This section imports the unit and generator data from the EPA CAM API. **An EPA 
 
 ### Import EIA data
 
-This section downloads and imports data from EIA-860 for the year specified in `params`. These data are automatically unzipped from the EIA site in `scripts/data_load_eia.R`. 
+This section downloads and imports data from EIA-860 and EIA-923 for the year specified in `params`. These data are automatically unzipped from the EIA site in `scripts/data_load_eia.R` into `data/raw_data/eia`.
 
 ```{r}
 #| label: data-load-eia 
@@ -193,14 +175,6 @@ This section downloads and imports data from EIA-860 for the year specified in `
 ## Modify EIA plant code based on eGRID known mismatch list
 
 In the production of the eGRID data set, EPA checks whether there are any discrepancies between the ORIS code in EPA's database and the plant code in EIA's database. A small number of plants do have these mismatches, and they are corrected in this section. This section changes the plant code in EIA's data, placing the changes in the `mod_eia_plant_id` column, to match EPA's ORIS code data, according to Table C-5 of Appendix C in the [eGRID2018 Techical Support Document](https://www.epa.gov/egrid/egrid-technical-support-document). A direct download for this table in .xlsx format can be found here: [epa-eia_plant_id_crosswalk.xlsx](https://www.epa.gov/sites/production/files/2020-09/epa-eia_plant_id_crosswalk.xlsx). The manual match Excel file has a copy of the eGRID epa-eia_plant_id_crosswalk that updates. Any updates to the eGRID file will be reflected in the manual match file.
-
-```{r}
-#| label: modify-crosswalk-data 
-#| file: "scripts/modify_crosswalk.R" 
-#| results: hold
-#| echo: false
-#| eval: false # hold off on running this chunk until later
-```
 
 # Match Data
 
@@ -247,8 +221,14 @@ Look for matches on the modified EPA and EIA unit identifiers between EPA and EI
 
 ```{r}
 #| label: match-crosswalk-data 
-#| file: "scripts/match_crosswalk.R" 
 #| echo: false
+
+source("scripts/match_crosswalk.R")
+
+epa_eia_crosswalk <- epa_eia_match_crosswalk$epa_eia_crosswalk
+generator_match_summary <- epa_eia_match_crosswalk$generator_match_summary
+boiler_match_summary <- epa_eia_match_crosswalk$boiler_match_summary
+
 ```
 
 ```{r}
@@ -291,7 +271,7 @@ boiler_match_table
 # Create table of counts of matches for each step
 crosswalk_summary_table <-
   epa_eia_crosswalk %>%
-  filter(str_detect(match_type_gen, "Unmatched|Excluded", negate = T) | str_detect(match_type_boiler, "Unmatched|Excluded", negate = T)) %>%
+  filter(str_detect(match_type_gen, "Unmatched|Excluded", negate = TRUE) | str_detect(match_type_boiler, "Unmatched|Excluded", negate = TRUE)) %>%
   summarize(
     epa_matched = n(),
     epa_distinct = n_distinct(epa_plant_id, epa_unit_id, epa_generator_id),
@@ -299,10 +279,10 @@ crosswalk_summary_table <-
   ) %>%
   mutate(
     epa_unmatched = epa_eia_crosswalk %>%
-      filter(str_detect(match_type_gen, "Unmatched", negate = F) | str_detect(match_type_boiler, "Unmatched", negate = F)) %>%
+      filter(str_detect(match_type_gen, "Unmatched", negate = FALSE) | str_detect(match_type_boiler, "Unmatched", negate = FALSE)) %>%
       nrow(),
     epa_excluded = epa_eia_crosswalk %>%
-      filter(str_detect(match_type_gen, "Excluded", negate = F) | str_detect(match_type_boiler, "Excluded", negate = F)) %>%
+      filter(str_detect(match_type_gen, "Excluded", negate = FALSE) | str_detect(match_type_boiler, "Excluded", negate = FALSE)) %>%
       nrow()
   ) %>%
   gt::gt() %>%
@@ -321,16 +301,18 @@ crosswalk_summary_table
 ```{r}
 #| label: import-frs-data
 #| results: hold
-#| echo: TRUE
+#| echo: false
+
 # add FRS IDs to crosswalk output
 # set to run/not run by changing TRUE/FALSE at the beginning of the code
 # WARNING: could take several minutes to run due to data retrieval
 
 if(!params$include_FRS) {
-  print("No FRS IDs added")
+  print("No FRS IDs added.")
 } else {
-  source("scripts/import_frs.R")
-  print("FRS IDs added")
+  source("scripts/include_frs.R")
+  epa_eia_crosswalk <- include_frs(epa_eia_crosswalk)
+  print("FRS IDs added.")
 }
 ```
 
@@ -339,25 +321,28 @@ if(!params$include_FRS) {
 ```{r}
 #| label: import-needs-data
 #| results: hold
-#| echo: TRUE
+#| echo: false
 
 if(!params$include_NEEDS) {
-  print("No NEEDS IDs added")
+  print("No NEEDS IDs added.")
 } else {
-  source("scripts/import_needs.R")
-  print("NEEDS IDs added")
+  source("scripts/include_needs.R")
+  epa_eia_crosswalk <- include_needs(epa_eia_crosswalk)
+  print("NEEDS IDs added.")
 }
 ```
 
 ## Crosswalk Output
 
-This document outputs an Excel file and a CSV file aggregated based on the params input `output_agg`.
+This document outputs an Excel file and a CSV file aggregated based on the params input `output_agg`: either to the plant level or none (kept at the unit level). 
 
 **Current output aggregation: `r params$output_agg`**
 
 ```{r}
 #| label: output-crosswalk
-#| file: "scripts/output_crosswalk.R" 
 #| results: hold
 #| echo: false
+
+output_crosswalk(epa_eia_crosswalk, agg_level = params$output_agg, diffs_only = params$diffs_only)
+
 ```

@@ -16,7 +16,7 @@
 
 save_output_data <- function(data, output_folder_path, filename){
   
-  #' save_output_data
+  #' @name save_output_data
   #' 
   #' Function to save RDS data in the output file and 
   #' create directories when necessary
@@ -33,12 +33,10 @@ save_output_data <- function(data, output_folder_path, filename){
   #' save_output_data(pm_plant_formatted, "1_production_model", "pm_plant_file.RDS")
 
   
-  # create save directories if they don't exist
-  # if(dir.exists(glue::glue("{output_folder_path}"))) {
-  #   print(glue::glue("Folder {output_folder_path} already exists."))
-  # } else {
-  #   dir.create(glue::glue("{output_folder_path}"))
-  # }
+  #create save directories if they don't exist
+  if(!dir.exists(glue::glue("{output_folder_path}"))) {
+    dir.create(glue::glue("{output_folder_path}"), recursive = TRUE)
+  }
   
   if(dir.exists(glue::glue("{output_folder_path}/{params$crosswalk_year}"))) {
     print(glue::glue("Folder {output_folder_path}/{params$crosswalk_year} already exists."))
