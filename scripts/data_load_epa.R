@@ -109,23 +109,22 @@ facility_df <-
     year = as.character(year)) %>%  # summing nameplate capacity from associated generators) 
   select(-"nameplate_capacity_char", -unit_type) %>% 
   tidyr::unnest(cols = generator_ids) %>%
-  mutate(epa_plant_id = facility_id,
+  mutate(mod_epa_unit_id = unit_id,
+         mod_epa_generator_id = generator_ids) %>%
+  rename(epa_state = state,
          epa_facility_name = facility_name,
-         epa_state = state,
+         epa_plant_id = facility_id,
+         epa_unit_id = unit_id,
          epa_latitude = latitude,
          epa_longitude = longitude,
-         epa_unit_id = unit_id,
-         mod_epa_unit_id = unit_id,
          epa_fuel_type = primary_fuel_type,
-         epa_generator_id = generator_ids,
-         mod_epa_generator_id = generator_ids,
-         epa_unit_type = unit_type_abb,
-         epa_nameplate_capacity = nameplate_capacity, 
-         epa_retire_year = retirement_year,
          epa_status = operating_status,
+         epa_generator_id = generator_ids,
+         epa_nameplate_capacity = nameplate_capacity, 
+         epa_prime_mover = unit_type_abb,
+         epa_retire_year = retirement_year,
          epa_status_date = commercial_operation_date) %>%
-  rename(generator_id = generator_ids) %>%
-  arrange(generator_id, unit_id)
+  arrange(epa_generator_id, epa_unit_id)
 
 ## Get emissions data -----
 
@@ -149,7 +148,7 @@ emissions_data_clean <-
   janitor::clean_names() %>% 
   mutate(year = as.character(year(date))) %>% # extracting year from date
   # select heat input and unit type alongside unit descriptors
-  select(year, facility_id, unit_id, primary_fuel_type, heat_input_mmbtu) %>%
+  select(year, epa_plant_id = facility_id, epa_unit_id = unit_id, epa_fuel_type = primary_fuel_type, heat_input_mmbtu) %>%
   mutate(across(where(is.character), ~ str_replace_all(.x, "\\|", ","))) %>% # fix for issue in API where there are a mix of pipes and commas in some character values
   # group by and sum annual heat input
   group_by(pick(-c(heat_input_mmbtu))) %>%
@@ -161,9 +160,9 @@ emissions_data_clean <-
 epa_data_combined <- 
   facility_df %>% 
   left_join(emissions_data_clean,
-            by = c("facility_id", "unit_id", "primary_fuel_type")) %>% 
+            by = c("epa_plant_id", "epa_unit_id", "epa_fuel_type")) %>% 
   coalesce_join_vars() %>% 
-  arrange(facility_id, unit_id)
+  arrange(epa_plant_id, epa_plant_id)
 
 # Clean up
 rm(epa_json)
