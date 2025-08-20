@@ -4,12 +4,16 @@
 ## 
 ## Purpose: 
 ## 
-## This section downloads and imports data from EIA-860 for the year specified above. 
-## To manually download the data from EIA, visit the [EIA-860 data](https://www.eia.gov/electricity/data/eia860/). 
+## This section downloads and imports data from EIA-860 and EIA-923 for the year specified above. 
+## To manually download the data from EIA, visit the [EIA-860 data](https://www.eia.gov/electricity/data/eia860/) and [EIA-923 data](https://www.eia.gov/electricity/data/eia923/). 
 ## Select and download the latest year's ZIP file on the right-hand-side of the page. 
-## The files used in this analysis are "3_1_Generator_Y{year}.xlsx" and "6_1_EnviroAssoc_Y{year}.xlsx", 
-## with "2___Plant_Y{year}.xlsx" to get lat/long.
-## 
+## The files used in this analysis are:
+##    EIA-860
+##      "3_1_Generator_Y{year}.xlsx"
+##      "6_1_EnviroAssoc_Y{year}.xlsx"
+##      "2___Plant_Y{year}.xlsx" (lat/lon data)
+##    EIA-923
+##      "EIA923_Schedules_2_3_4_5_M_12_{year}_Final_Revision.xlsx" (heat input data)
 ##
 ## -------------------------------
 
@@ -185,7 +189,7 @@ sched_2_3_4_5_m_12_dfs <-
   purrr::map(., ~ .x %>% 
                rename_with(tolower) %>% 
                janitor::clean_names()) %>% # this lower cases and converts to snake_case
-  setNames(., janitor::make_clean_names(str_replace_all(sheets_923_1, "Page \\d+ ", ""))) %>% # This assigns cleaned sheets names name values for list of dataframes. Storing df names without Page #s
+  setNames(., janitor::make_clean_names(str_replace_all(sheets_923, "Page \\d+ ", ""))) %>% # This assigns cleaned sheets names name values for list of dataframes. Storing df names without Page #s
   purrr::map_at("puerto_rico", # modifing puert0_rico tab only
                 ~ .x %>% 
                   rename("reserved" = "reserved_10", # fixing issue of two "Reserved" columns. Need to figure out better way in case they're not 10 and 17
@@ -226,9 +230,9 @@ eia_heat <-
   glimpse()
 
 # Creating list of necessary data -----
-eia_raw <- list(boiler = eia_boiler, 
-                generator = eia_generator,
-                heat_input = eia_heat)
+eia_raw <- list(boiler_860 = eia_boiler, 
+                generator_860 = eia_generator,
+                heat_input_923 = eia_heat)
 
 # Saving EIA data -----
 eia_file_path <- "data/raw_data/eia"
