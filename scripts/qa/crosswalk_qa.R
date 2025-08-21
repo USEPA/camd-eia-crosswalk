@@ -65,15 +65,15 @@ if(file.exists("epa_eia_crosswalk.csv")) {
                                   col_names = TRUE) %>%
       select(-sequence_number)
 } else {
-  stop(glue::glue("Crosswalk original output 'epa_eia_crosswalk.xlsx' does not exist and is required for QA. \n Skipping crosswalk QA."))
+  stop(glue::glue("Crosswalk original output 'epa_eia_crosswalk.csv' does not exist and is required for QA. \n Skipping crosswalk QA."))
 }
 
 # Import New version of EPA-EIA Crosswalk -----
-if(file.exists("data/outputs/epa_eia_crosswalk.csv")) {
-  crosswalk_new <- read_csv("data/outputs/epa_eia_crosswalk.csv",
+if(file.exists("data/outputs/2018/epa_eia_crosswalk_2018.csv")) {
+  crosswalk_new <- read_csv("data/outputs/2018/epa_eia_crosswalk_2018.csv",
                             col_names = TRUE)
 } else {
-  stop(glue::glue("Crosswalk updated output 'data/outputs/epa_eia_crosswalk.csv' does not exist and is required for QA. \n Please run r_epa_eia_crosswalk.qmd to obtain."))
+  stop(glue::glue("Crosswalk updated output 'data/outputs/2018/epa_eia_crosswalk_2018.csv' does not exist and is required for QA. \n Please run r_epa_eia_crosswalk.qmd to obtain."))
 }
 
 # Find differences in columns present ----
