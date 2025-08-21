@@ -74,7 +74,7 @@ Units are matched on ORIS/modified plant code, unit/boiler ID, and generator ID.
 
 The two sets are joined on `epa_plant_id`, `epa_unit_id`, `epa_generator_id`, `eia_plant_id`, and `eia_generator_id`
 
-> Note: <br>To use this code, you will need an API key. You can request one from the [CA< API overview](https://www.epa.gov/power-sector/cam-api-portal#/documentation).
+> Note: <br>To use this code, you will need an API key. You can request one from the [CA\< API overview](https://www.epa.gov/power-sector/cam-api-portal#/documentation).
 
 # Processing
 
@@ -334,7 +334,7 @@ if(!params$include_NEEDS) {
 
 ## Crosswalk Output
 
-This document outputs an Excel file and a CSV file aggregated based on the params input `output_agg`: either to the plant level or none (kept at the unit level). 
+This document outputs an Excel file and a CSV file aggregated based on the params input `output_agg`: either to the plant level or none (kept at the unit level).
 
 **Current output aggregation: `r params$output_agg`**
 

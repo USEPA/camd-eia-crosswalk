@@ -60,7 +60,7 @@ bucket_url_base <- 'https://api.epa.gov/easey/bulk-files/'
 facility_path <- 
   epa_json %>% 
   unnest(cols = metadata) %>% 
-  filter(year == params$crosswalk_year, # flag: check if this is okay
+  filter(year == params$crosswalk_year, 
          dataType == "Facility") %>% 
   pull(s3Path)
 
@@ -72,28 +72,27 @@ facility_df <-
   mutate(
     generator_ids = str_extract_all(associated_generators_nameplate_capacity_mwe, "\\S+(?= \\()"), # extracting associated generators
     nameplate_capacity_char = (str_extract_all(associated_generators_nameplate_capacity_mwe, "(?<=\\()\\d+(\\.\\d+)?(?=\\))")), # extracting nameplate capacity values
-    associated_generators = purrr::map_chr(generator_ids, ~ paste(.x, collapse = ", ")), # pasting together associated generators
-    nameplate_capacity = purrr::map_dbl(nameplate_capacity_char, ~ sum(as.numeric(.x), na.rm = TRUE)),
     retirement_year = ifelse(operating_status != "Operating", year(ymd(as.Date(commercial_operation_date))), 0), # switch from OPR to Operating - adjust in new version?
-    year = as.character(year)) %>%  # summing nameplate capacity from associated generators) 
+    year = as.character(year)) %>% # convert year to character
+  tidyr::unnest_longer(col = c("generator_ids", "nameplate_capacity_char"), keep_empty = TRUE) %>% # unnest generator IDs and nameplate capacity
+  distinct() %>% 
+  mutate(nameplate_capacity = as.numeric(nameplate_capacity_char)) %>% 
   select(-"nameplate_capacity_char") %>% 
-  tidyr::unnest(cols = generator_ids) %>%
-  mutate(epa_plant_id = facility_id,
+  rename(epa_plant_id = facility_id,
          epa_facility_name = facility_name,
          epa_state = state,
          epa_latitude = latitude,
          epa_longitude = longitude,
          epa_unit_id = unit_id,
-         mod_epa_unit_id = unit_id,
          epa_fuel_type = primary_fuel_type,
          epa_generator_id = generator_ids,
-         mod_epa_generator_id = generator_ids,
          epa_nameplate_capacity = nameplate_capacity, 
          epa_retire_year = retirement_year,
          epa_status = operating_status,
          epa_status_date = commercial_operation_date) %>%
-  rename(generator_id = generator_ids) %>%
-  arrange(generator_id, unit_id)
+  mutate(mod_epa_unit_id = epa_unit_id,
+         mod_epa_generator_id = epa_generator_id) %>% 
+  arrange(epa_generator_id, epa_unit_id)
 
 # Clean up
 rm(epa_json)

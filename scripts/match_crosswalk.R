@@ -411,9 +411,9 @@ match_crosswalk <- function() {
   epa_unmatched_2 <- 
     epa_unmatched %>%
     mutate(
-      match_type_gen = case_when(facility_id %in% epa_unconnected_grid$oris_code ~ "EPA Unmatched: this plant is not connected to the grid and is not in EIA data",
+      match_type_gen = case_when(epa_plant_id %in% epa_unconnected_grid$oris_code ~ "EPA Unmatched: this plant is not connected to the grid and is not in EIA data",
                                  TRUE ~ "EPA Unmatched"),
-      match_type_boiler = case_when(facility_id %in% epa_unconnected_grid$oris_code ~ "EPA Unmatched: this plant is not connected to the grid and is not in EIA data",
+      match_type_boiler = case_when(epa_plant_id %in% epa_unconnected_grid$oris_code ~ "EPA Unmatched: this plant is not connected to the grid and is not in EIA data",
                                     TRUE ~ "EPA Unmatched")
     )
   
