@@ -23,6 +23,7 @@ library(openxlsx)
 # Load necessary functions
 source("scripts/functions/function_save_data.R")
 source("scripts/functions/function_check_params.R")
+source("scripts/functions/function_check_valid_url.R")
 
 # Set up year dimensions
 if (!exists("params")) {
@@ -45,7 +46,7 @@ if(!dir.exists(glue::glue("data/raw_data/eia/{params$crosswalk_year}"))) {
 
 
 if(check_valid_url(eia_860_file)) { 
-  download.file(eia_data_file,
+  download.file(eia_860_file,
                 glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"))
     
   unzip(zipfile = str_glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"), 

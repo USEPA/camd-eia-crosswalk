@@ -74,7 +74,7 @@ Units are matched on ORIS/modified plant code, unit/boiler ID, and generator ID.
 
 The two sets are joined on `epa_plant_id`, `epa_unit_id`, `epa_generator_id`, `eia_plant_id`, and `eia_generator_id`
 
-> Note: <br>To use this code, you will need an API key. You can request one from the [CA\< API overview](https://www.epa.gov/power-sector/cam-api-portal#/documentation).
+> Note: <br>To use this code, you will need an API key. You can request one from the [CAM API overview](https://www.epa.gov/power-sector/cam-api-portal#/documentation).
 
 # Processing
 
@@ -90,6 +90,7 @@ The two sets are joined on `epa_plant_id`, `epa_unit_id`, `epa_generator_id`, `e
 ```{r}
 #| label: load-qmd-packages
 #| echo: false
+#| warning: false
 
 library(dplyr)
 library(ggiraph)
@@ -222,18 +223,20 @@ Look for matches on the modified EPA and EIA unit identifiers between EPA and EI
 ```{r}
 #| label: match-crosswalk-data 
 #| echo: false
+#| warning: false
 
 source("scripts/match_crosswalk.R")
 
-epa_eia_crosswalk <- epa_eia_match_crosswalk$epa_eia_crosswalk
-generator_match_summary <- epa_eia_match_crosswalk$generator_match_summary
-boiler_match_summary <- epa_eia_match_crosswalk$boiler_match_summary
+epa_eia_crosswalk <- match_crosswalk$epa_eia_crosswalk
+generator_match_summary <- match_crosswalk$generator_match_summary
+boiler_match_summary <- match_crosswalk$boiler_match_summary
 
 ```
 
 ```{r}
 #| label: generator-match-table
 #| echo: false
+#| warning: false
 
 generator_match_table <- generator_match_summary %>%
                          gt::gt() %>%
@@ -311,7 +314,6 @@ if(!params$include_FRS) {
   print("No FRS IDs added.")
 } else {
   source("scripts/include_frs.R")
-  epa_eia_crosswalk <- include_frs(epa_eia_crosswalk)
   print("FRS IDs added.")
 }
 ```
@@ -327,7 +329,6 @@ if(!params$include_NEEDS) {
   print("No NEEDS IDs added.")
 } else {
   source("scripts/include_needs.R")
-  epa_eia_crosswalk <- include_needs(epa_eia_crosswalk)
   print("NEEDS IDs added.")
 }
 ```
