@@ -34,9 +34,9 @@ check_params <- function() {
       params$earliest_retirement_year <- readline(prompt = "Input earliest_retirement_year: ")
       params$earliest_retirement_year <- as.character(params$earliest_retirement_year) 
     } else if(!("include_FRS" %in% names(params))) {  # if params() is defined, but include_FRS is not, define it here 
-      params$include_FRS <- readline(prompt = "Input include_FRS: ")
+      params$include_FRS <- readline(prompt = "Input include_FRS (TRUE/FALSE): ")
     } else if(!("include_NEEDS" %in% names(params))) {  # if params() is defined, but include_NEEDS is not, define it here 
-      params$include_NEEDS <- readline(prompt = "Input include_NEEDS: ")
+      params$include_NEEDS <- readline(prompt = "Input include_NEEDS (TRUE/FALSE): ")
     }
   } else { 
     params <- list()
@@ -44,8 +44,8 @@ check_params <- function() {
     params$crosswalk_year <- as.character(params$crosswalk_year)
     params$earliest_retirement_year <- readline(prompt = "Input earliest_retirement_year: ")
     params$earliest_retirement_year <- as.character(params$earliest_retirement_year)
-    params$include_FRS <- readline(prompt = "Input include_FRS: ")
-    params$include_NEEDS <- readline(prompt = "Input include_NEEDS: ")
+    params$include_FRS <- readline(prompt = "Input include_FRS (TRUE/FALSE): ")
+    params$include_NEEDS <- readline(prompt = "Input include_NEEDS (TRUE/FALSE): ")
   }
   
   # valid eGRID years (update this every crosswalk year to include latest year)

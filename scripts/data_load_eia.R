@@ -19,6 +19,7 @@ library(dplyr)
 library(stringr)
 library(readxl)
 library(openxlsx)
+library(readr)
 
 # Load necessary functions
 source("scripts/functions/function_save_data.R")
@@ -44,7 +45,6 @@ if(!dir.exists(glue::glue("data/raw_data/eia/{params$crosswalk_year}"))) {
 
 # Import plant, generator, and boiler (EnviroAssoc) data from EIA-860 using data year specified in eia_860_year
 
-
 if(check_valid_url(eia_860_file)) { 
   download.file(eia_860_file,
                 glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"))
@@ -53,7 +53,7 @@ if(check_valid_url(eia_860_file)) {
         exdir = glue::glue("data/raw_data/eia/{params$crosswalk_year}"))
   
 } else if(check_valid_url(eia_860_file_with_archive)) { 
-  download.file(eia_data_file_with_archive,
+  download.file(eia_860_file_with_archive,
                 glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"))
   
   unzip(zipfile = glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"), 

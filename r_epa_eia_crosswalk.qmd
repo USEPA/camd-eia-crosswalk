@@ -341,9 +341,7 @@ This document outputs an Excel file and a CSV file aggregated based on the param
 
 ```{r}
 #| label: output-crosswalk
+#| file: "scripts/output_crosswalk.R"
 #| results: hold
 #| echo: false
-
-output_crosswalk(epa_eia_crosswalk, agg_level = params$output_agg, diffs_only = params$diffs_only)
-
 ```
