@@ -1,4 +1,16 @@
-
+## -------------------------------
+##
+## Output final crosswalk data
+## 
+## Purpose: 
+## 
+## This function formats the final crosswalk files and aggregates data to specified parameters. 
+##
+## Authors:
+##    Madeline Zhang, Abt Global
+##    Teagan Goforth, Abt Global
+##
+## -------------------------------
 
 output_crosswalk <- function(crosswalk_df, agg_level, diffs_only = FALSE) {
   
