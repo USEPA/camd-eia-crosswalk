@@ -43,7 +43,7 @@ save_output_data <- function(data, output_folder_path, filename){
   if(dir.exists(glue::glue("{output_folder_path}/{params$crosswalk_year}"))) {
     print(glue::glue("Folder {output_folder_path}/{params$crosswalk_year} already exists."))
   } else {
-    dir.create(glue::glue("{output_folder_path}/{params$crosswalk_year}"))
+    dir.create(glue::glue("{output_folder_path}/{params$crosswalk_year}"), recursive = TRUE)
   }
   
   print(glue::glue("Saving {filename} to folder {output_folder_path}/{params$crosswalk_year}"))

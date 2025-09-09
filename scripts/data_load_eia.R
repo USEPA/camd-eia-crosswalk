@@ -224,10 +224,12 @@ eia_heat <-
     .cols = starts_with("quantity_of_fuel_consumed_"),
     .fns = ~ . * get(str_replace(cur_column(), "quantity_of_fuel_consumed_", "mmbtu_per_unit_")), # identifies corresponding mmbtu_per_unit and multiplies by quantity column
     .names = "heat_input_{str_replace(.col, 'quantity_of_fuel_consumed_','')}"),
-    heat_input = rowSums(pick(all_of(starts_with("heat_input"))))) %>% # getting annual heat_input, summing across all monthly heat columns
-  select(plant_id, plant_name, plant_state, prime_mover, boiler_id, fuel_type, heat_input) %>% 
+    heat_input_mmbtu = rowSums(pick(all_of(starts_with("heat_input"))))) %>% # getting annual heat_input, summing across all monthly heat columns
+  # convert plant_id to double to align with rest of crosswalk
+  mutate(plant_id = as.double(plant_id)) %>%
+  select(plant_id, plant_name, plant_state, prime_mover, boiler_id, fuel_type, heat_input_mmbtu) %>% 
   rename_with(~ paste0("eia_", .x)) %>%
-  glimpse()
+  distinct()
 
 # Creating list of necessary data -----
 eia_raw <- list(boiler_860 = eia_boiler, 
