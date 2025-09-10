@@ -4,7 +4,7 @@
 ## 
 ## Purpose: 
 ## 
-## This section downloads and imports data from EIA-860 for the year specified above. 
+## This script downloads and imports data from EIA-860 and EIA-923 for the year specified above. 
 ## To manually download the data from EIA, visit the [EIA-860 data](https://www.eia.gov/electricity/data/eia860/). 
 ## Select and download the latest year's ZIP file on the right-hand-side of the page. 
 ## The files used in this analysis are "3_1_Generator_Y{year}.xlsx" and "6_1_EnviroAssoc_Y{year}.xlsx", 
@@ -12,6 +12,7 @@
 ## 
 ## Authors: 
 ##    Madeline Zhang, Abt Global
+##
 ## -------------------------------
 
 # Load in libraries
@@ -59,7 +60,7 @@ if(check_valid_url(eia_860_file)) {
   unzip(zipfile = glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia860{params$crosswalk_year}.zip"), 
         exdir = glue::glue("data/raw_data/eia/{params$crosswalk_year}"))
 } else { 
-  print("No valid EIA-860 file found to download. Check URLs provided.")}
+  stop("No valid EIA-860 file found to download. Check URLs provided.")}
 
 
 # Get plant location data

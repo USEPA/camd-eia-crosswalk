@@ -13,6 +13,8 @@
 library(openxlsx)
 library(dplyr)
 library(tidyr)
+library(readr)
+library(stringr)
 
 # Load necessary functions
 source("scripts/functions/function_check_params.R")
@@ -39,25 +41,25 @@ if(!("agg_level" %in% names(params))) {  # if params() is defined, but agg_level
 epa_eia_crosswalk <- 
   read_rds(glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_match.RDS"))$epa_eia_crosswalk
 
-if(params$include_FRS == TRUE) { 
+if(params$include_FRS) { 
   epa_frs <- 
     read_rds(glue::glue("data/outputs/{params$crosswalk_year}/epa_frs_match.RDS"))
 }
 
-if(params$include_NEEDS == TRUE) { 
+if(params$include_NEEDS) { 
   eia_needs <- 
     read_rds(glue::glue("data/outputs/{params$crosswalk_year}/eia_needs_match.RDS"))
 }
 
 # Merge datasets where applicable -----------------------
 
-if(params$include_FRS == TRUE) { 
+if(params$include_FRS) { 
   epa_eia_crosswalk <- 
     epa_eia_crosswalk %>% 
     full_join(epa_frs) %>% 
     relocate(frs_id, .before = match_type_gen)}
 
-if(params$include_NEEDS == TRUE) { 
+if(params$include_NEEDS) { 
   epa_eia_crosswalk <- 
     epa_eia_crosswalk %>% 
     full_join(eia_needs) %>% 

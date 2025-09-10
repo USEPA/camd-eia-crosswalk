@@ -26,6 +26,7 @@ output_crosswalk <- function(crosswalk_df, agg_level, diffs_only = FALSE) {
   require(openxlsx)
   require(dplyr)
   require(tidyr)
+  require(stringr)
   
   # create field description labels 
   field_description_labels <-
@@ -69,6 +70,17 @@ output_crosswalk <- function(crosswalk_df, agg_level, diffs_only = FALSE) {
   field_desc_df <- data.frame("Column Name" = field_col_names, "Description" = field_col_desc)
   colnames(field_desc_df) <- c("Column Name", "Description")
   
+  # check if FRS and/or NEEDS are included, and add suffix to file name if so 
+  if(params$include_FRS) { 
+    frs_string <- "_frs"
+  } else { 
+    frs_string <- ""}
+  
+  if(params$include_NEEDS) { 
+    needs_string <- "_needs"
+  } else { 
+    needs_string <- ""}
+  
   # clean year columns
   clean_cols <- c(
     "epa_retire_year",
@@ -81,10 +93,6 @@ output_crosswalk <- function(crosswalk_df, agg_level, diffs_only = FALSE) {
   
   # aggregate to plant if specified 
   if(agg_level == "plant") {
-    agg_groupby_cols <-
-      c("epa_state",
-        "epa_facility_name",
-        "epa_plant_id") 
     
     crosswalk_df <- 
       crosswalk_df %>%
@@ -101,12 +109,12 @@ output_crosswalk <- function(crosswalk_df, agg_level, diffs_only = FALSE) {
         filter(plant_id_change_flag == 1) %>%
         select(-plant_id_change_flag)
       
-      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_diffs_only_{params$crosswalk_year}.xlsx")
-      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_diffs_only_{params$crosswalk_year}.csv")
+      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
+      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.csv")
       
     } else {
-      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_{params$crosswalk_year}.xlsx")
-      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_{params$crosswalk_year}.csv")
+      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
+      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant{frs_string}{needs_string}_{params$crosswalk_year}.csv")
     }
   } else { 
     if(diffs_only) { 
@@ -114,11 +122,11 @@ output_crosswalk <- function(crosswalk_df, agg_level, diffs_only = FALSE) {
         crosswalk_df %>%
         filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
       
-      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only_{params$crosswalk_year}.xlsx")
-      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only_{params$crosswalk_year}.csv")
+      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
+      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.csv")
     } else { 
-      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_{params$crosswalk_year}.xlsx")
-      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_{params$crosswalk_year}.csv")
+      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
+      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk{frs_string}{needs_string}_{params$crosswalk_year}.csv")
     }
   }
   
