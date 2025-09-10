@@ -57,10 +57,15 @@ unit_manual_excluded <-
   read_excel(
     "manual_matches.xlsx",
     sheet = "unit_manual_excluded",
-    range = cell_cols("A:C"),
-    col_types = head(manual_match_cols, n = 3),
+    range = cell_cols("A:D"),
+    col_types = c("text", "numeric", "text", "text"),
     trim_ws = TRUE
-  ) %>% janitor::clean_names()
+  ) %>% janitor::clean_names() %>%
+  filter(year == glue::glue("Only {params$crosswalk_year}") | # only exclude units for specified crosswalk_year
+           year == "All" | 
+           suppressWarnings(as.numeric(year) <= as.numeric(params$crosswalk_year)))
+
+rm(manual_match_cols)
 
 # Modify EIA plant code based on eGRID known mismatch list -------
 
