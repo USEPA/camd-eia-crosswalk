@@ -12,14 +12,14 @@
 ##
 ## -------------------------------
 
-output_crosswalk <- function(crosswalk_df, agg_level, diffs_only = FALSE) {
+output_crosswalk <- function(crosswalk_df, output_agg, diffs_only = FALSE) {
   
   #' @name output_crosswalk
   #' 
   #' Formats and outputs crosswalk file. 
   #' 
   #' @param crosswalk_df Crosswalk data.frame to output
-  #' @param agg_level Specifies what aggregation level the output is. "Plant" or "none". 
+  #' @param output_agg Specifies what aggregation level the output is. "plant" or "none". 
   #' @param diffs_only Specifies whether to output differences between the EPA and EIA dataset, or all matches. 
   
   # Require libraries
@@ -92,7 +92,7 @@ output_crosswalk <- function(crosswalk_df, agg_level, diffs_only = FALSE) {
                   ~na_if(.x, 0)))
   
   # aggregate to plant if specified 
-  if(agg_level == "plant") {
+  if(output_agg == "plant") {
     
     crosswalk_df <- 
       crosswalk_df %>%

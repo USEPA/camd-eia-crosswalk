@@ -23,18 +23,21 @@ source("scripts/functions/function_output_crosswalk.R")
 # Set up year parameters
 if (!exists("params")) {
   params <- check_params()
+  
+  # check for params$diffs_only and params$agg_level
+  if(!("diffs_only" %in% names(params))) {  # if params() is defined, but diffs_only is not, define it here 
+    params$diffs_only <- readline(prompt = "Input diffs_only: ") } 
+  
+  if(!("output_agg" %in% names(params))) {  # if params() is defined, but agg_level is not, define it here 
+    params$output_agg <- readline(prompt = "Input output_agg (plant or none): ")
+    params$output_agg <- as.character(params$output_agg) 
+  }
+  
 } else {
   print("Crosswalk parameters are already defined.")
 }
 
-# check for params$diffs_only and params$agg_level
-if(!("diffs_only" %in% names(params))) {  # if params() is defined, but diffs_only is not, define it here 
-  params$diffs_only <- readline(prompt = "Input diffs_only: ") } 
 
-if(!("agg_level" %in% names(params))) {  # if params() is defined, but agg_level is not, define it here 
-  params$agg_level <- readline(prompt = "Input agg_level: ")
-  params$agg_level <- as.character(params$agg_level) 
-}
 
 # Load data ----------------------------
 
@@ -67,4 +70,4 @@ if(params$include_NEEDS) {
 
 # Format and output crosswalk ---------------------
 
-output_crosswalk(epa_eia_crosswalk, params$agg_level, params$diffs_only)
+output_crosswalk(epa_eia_crosswalk, params$output_agg, params$diffs_only)
