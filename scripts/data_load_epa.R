@@ -1,51 +1,52 @@
 ## -------------------------------
 ##
-## Data load CAMPD
+## Data load from EPA CAM API
 ## 
 ## Purpose: 
 ## 
-## This section imports the unit and generator data from the CAMPD API. 
-## A CAMPD API key is required and can be obtained easily by signing up at the 
-## (https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-api#signup). # fix this
-## 
+## This section imports the unit and generator data from the EPA CAM API. 
+## A CAM API key is required and can be obtained easily by signing up at the 
+## (https://www.epa.gov/power-sector/cam-api-portal#/api-key-signup). 
+##
+## Authors: 
+##    Madeline Zhang, Abt Global
 ##
 ## -------------------------------
 
 # Load libraries --------
-library(tidyverse)
+library(dplyr)
+library(readr)
+library(tidyr)
+library(stringr)
 library(lubridate)
 library(httr)
 library(tidyjson)
 library(jsonlite)
-library(readxl)
-library(openxlsx)
-library(purrr)
 
-# Load necessary functions
-source("scripts/functions/function_save_output_data.R")
+# Load necessary functions ----------------
+source("scripts/functions/function_save_data.R")
 source("scripts/functions/function_check_params.R")
 source("scripts/functions/function_coalesce_join_vars.R")
 
-# Set up API and API key ----------
-
-# Read API key from text file
-api_key <- read_lines("api_keys/epa_api_key.txt")
-
-# Set up year dimensions
+# Set parameters ------------------------
 if (!exists("params")) {
   params <- check_params()
 } else {
   print("Crosswalk parameters are already defined.")
 }
 
-if (api_key == "YOUR_API_KEY") { # flag: default to this in epa_api_key.txt file
-  stop("You must provide a EPA API key")
-}
+# Set up Query API ----------
+
+# Read API key from text file
+if(file.exists("api_keys/epa_api_key.txt")) { 
+  api_key <- read_lines("api_keys/epa_api_key.txt")
+} else{ 
+  stop("You must provide an API key. See README with instructions in how to obtain one.")}
 
 # Call API using API key
 response <-
-  GET(str_glue(
-    "https://api.epa.gov/easey/camd-services/bulk-files?API_KEY={api_key}" # EPA/CAMPD API 
+  GET(glue::glue(
+    "https://api.epa.gov/easey/camd-services/bulk-files?API_KEY={api_key}" # EPA/CAM API 
   ))
 
 # If something is wrong with the request, fail gracefully
@@ -88,7 +89,7 @@ bucket_url_base <- 'https://api.epa.gov/easey/bulk-files/'
 facility_path <- 
   epa_json %>% 
   unnest(cols = metadata) %>% 
-  filter(year == params$crosswalk_year, # flag: check if this is okay
+  filter(year == params$crosswalk_year, 
          dataType == "Facility") %>% 
   pull(s3Path)
 
@@ -100,27 +101,31 @@ facility_df <-
   mutate(
     generator_ids = str_extract_all(associated_generators_nameplate_capacity_mwe, "\\S+(?= \\()"), # extracting associated generators
     nameplate_capacity_char = (str_extract_all(associated_generators_nameplate_capacity_mwe, "(?<=\\()\\d+(\\.\\d+)?(?=\\))")), # extracting nameplate capacity values
-    associated_generators = purrr::map_chr(generator_ids, ~ paste(.x, collapse = ", ")), # pasting together associated generators
-    nameplate_capacity = purrr::map_dbl(nameplate_capacity_char, ~ sum(as.numeric(.x), na.rm = TRUE)),
     # update unit type format to match EIA formatting
     unit_type = str_replace(unit_type, "\\(.*?\\)", "") %>% str_trim(), # removing notes about start dates and getting rid of extra white space
     unit_type_abb = recode(unit_type, !!!unit_abbs), # recoding values based on lookup table
     retirement_year = ifelse(operating_status != "Operating", year(ymd(as.Date(commercial_operation_date))), 0), # switch from OPR to Operating - adjust in new version?
-    year = as.character(year)) %>%  # summing nameplate capacity from associated generators) 
-  select(-"nameplate_capacity_char", -unit_type) %>% 
-  tidyr::unnest(cols = generator_ids) %>%
+    year = as.character(year)) %>%  
+  tidyr::unnest_longer(col = c("generator_ids", "nameplate_capacity_char"), keep_empty = TRUE) %>% # unnest generator IDs and nameplate capacity
   mutate(mod_epa_unit_id = unit_id,
          mod_epa_generator_id = generator_ids) %>%
+  distinct() %>% 
+  mutate(nameplate_capacity = as.numeric(nameplate_capacity_char)) %>% 
+  select(-"nameplate_capacity_char") %>% 
   rename(epa_state = state,
+         epa_plant_id = facility_id,
          epa_facility_name = facility_name,
          epa_plant_id = facility_id,
          epa_unit_id = unit_id,
          epa_latitude = latitude,
          epa_longitude = longitude,
          epa_fuel_type = primary_fuel_type,
-         epa_status = operating_status,
+         epa_unit_id = unit_id,
+         epa_fuel_type = primary_fuel_type,
          epa_generator_id = generator_ids,
          epa_nameplate_capacity = nameplate_capacity, 
+         epa_status = operating_status,
+         epa_generator_id = generator_ids,
          epa_prime_mover = unit_type_abb,
          epa_retire_year = retirement_year,
          epa_status_date = commercial_operation_date) %>%
@@ -135,7 +140,7 @@ emissions_files <-
          dataSubType == "Daily",
          year == params$crosswalk_year,
          !is.na(quarter)) %>% # this identifies quarterly aggregations
-  mutate(file_path = paste0(bucket_url_base,s3Path)) 
+  mutate(file_path = paste0(bucket_url_base,s3Path))
 
 # now iterating over each file path and binding into one dataframe.
 emissions_data <- 
@@ -162,7 +167,7 @@ epa_data_combined <-
   left_join(emissions_data_clean,
             by = c("epa_plant_id", "epa_unit_id", "epa_fuel_type")) %>% 
   coalesce_join_vars() %>% 
-  arrange(epa_plant_id, epa_plant_id)
+  arrange(epa_plant_id, epa_unit_id)
 
 # Clean up
 rm(epa_json)
@@ -172,4 +177,4 @@ rm(response)
 epa_file_path <- "data/raw_data/epa"
 epa_file_name <- "epa_raw.RDS"
 
-# save_output_data(epa_data_combined, epa_file_path, epa_file_name)
+save_data(facility_df, epa_file_path, epa_file_name)

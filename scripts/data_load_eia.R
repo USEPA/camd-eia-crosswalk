@@ -4,7 +4,7 @@
 ## 
 ## Purpose: 
 ## 
-## This section downloads and imports data from EIA-860 and EIA-923 for the year specified above. 
+## This script downloads and imports data from EIA-860 and EIA-923 for the year specified above. 
 ## To manually download the data from EIA, visit the [EIA-860 data](https://www.eia.gov/electricity/data/eia860/) and [EIA-923 data](https://www.eia.gov/electricity/data/eia923/). 
 ## Select and download the latest year's ZIP file on the right-hand-side of the page. 
 ## The files used in this analysis are:
@@ -15,22 +15,22 @@
 ##    EIA-923
 ##      "EIA923_Schedules_2_3_4_5_M_12_{year}_Final_Revision.xlsx" (heat input data)
 ##
+## Authors: 
+##    Madeline Zhang, Abt Global
+##
 ## -------------------------------
 
-# Load libraries -----
-library(tidyverse)
-library(lubridate)
-library(httr)
-library(tidyjson)
-library(jsonlite)
+# Load in libraries
+library(dplyr)
+library(stringr)
 library(readxl)
 library(openxlsx)
-library(purrr)
-library(stringr)
+library(readr)
 
-# Load necessary functions -----
-source("scripts/functions/function_save_output_data.R")
+# Load necessary functions
+source("scripts/functions/function_save_data.R")
 source("scripts/functions/function_check_params.R")
+source("scripts/functions/function_check_valid_url.R")
 
 # Set up year dimensions -----
 if (!exists("params")) {
@@ -54,31 +54,32 @@ for (form in forms) {
   data_path <- paste0(data_destination,glue::glue("eia{form}{params$crosswalk_year}.zip"))
 
   # check if EIA form folder exists
-  if(dir.exists(data_destination)) {
-    print(glue::glue("Folder {data_destination} already exists."))
-  } else {
-    dir.create(data_destination, recursive = TRUE)
+  if(!dir.exists(glue::glue("{data_destination}"))) {
+    dir.create(glue::glue("{data_destination}"), recursive = TRUE)
   }
   
-  # download file .zip file
-  download.file(data_file, data_path)
-  
-  # unzip .zip file
-  tryCatch({
+  if(check_valid_url(data_file)) {
+    # download file .zip file
+    download.file(data_file, data_path)
     
-    # try to unzip downloaded file
-    unzip(zipfile = data_path, exdir = data_destination)
-    
-  }, warning = function(w) {
-    
-    # if warning exists, download backup url and unzip
-    download.file(data_file_try2, data_path)
-    unzip(zipfile = data_path, exdir = data_destination)
-  })
+    # unzip .zip file
+    tryCatch({
+      
+      # try to unzip downloaded file
+      unzip(zipfile = data_path, exdir = data_destination)
+      
+    }, warning = function(w) {
+      
+      # if warning exists, download backup url and unzip
+      download.file(data_file_try2, data_path)
+      unzip(zipfile = data_path, exdir = data_destination)
+    })
+  } else {
+    stop("No valid file found to download. Check URLs provided.")
+  }
 }
 
-
-# Get EIA-860 Data -----
+# Get EIA-860 data --------------
 
 dir_860 <- str_glue("data/raw_data/eia/{params$crosswalk_year}/860/")
 
@@ -240,6 +241,5 @@ eia_raw <- list(boiler_860 = eia_boiler,
 eia_file_path <- "data/raw_data/eia"
 eia_file_name <- "eia_raw.RDS"
 
-save_output_data(eia_raw, eia_file_path, eia_file_name)
-
+save_data(eia_raw, eia_file_path, eia_file_name)
 
