@@ -90,7 +90,7 @@ cols_missing_old <-
 # EPA units in New not in Old
 check_missing_units_old <- 
   crosswalk_new %>% 
-  anti_join(crosswalk_old, by = "epa_unit_id") %>% 
+  anti_join(crosswalk_old, by = c("epa_plant_id", "epa_unit_id")) %>% 
   filter(!is.na(epa_unit_id)) %>%
   select(epa_plant_id, epa_unit_id, epa_generator_id, eia_plant_id, eia_boiler_id,  eia_generator_id)
 save_diffs(check_missing_units_old)
@@ -99,7 +99,7 @@ save_diffs(check_missing_units_old)
 # currently have 102 additional in the old but none of them have been matched
 check_missing_units_new <- 
   crosswalk_old %>% 
-  anti_join(crosswalk_new, by = "epa_unit_id") %>% 
+  anti_join(crosswalk_new, by = c("epa_plant_id", "epa_unit_id")) %>% 
   filter(!is.na(epa_unit_id)) %>%
   select(epa_plant_id, epa_unit_id, epa_generator_id, eia_plant_id, eia_boiler_id,  eia_generator_id) %>% distinct()
 save_diffs(check_missing_units_new)
