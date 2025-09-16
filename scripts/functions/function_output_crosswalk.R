@@ -1,16 +1,34 @@
 ## -------------------------------
 ##
-## Output crosswalk functions
+## Output final crosswalk data
 ## 
 ## Purpose: 
 ## 
-## This file contains all matching functions required for exporting and saving
-## crosswalk file data
+## This function formats the final crosswalk files and aggregates data to specified parameters. 
+##
+## Authors:
+##    Madeline Zhang, Abt Global
+##    Teagan Goforth, Abt Global
 ##
 ## -------------------------------
 
-output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
+output_crosswalk <- function(crosswalk_df, output_agg, diffs_only = FALSE) {
   
+  #' @name output_crosswalk
+  #' 
+  #' Formats and outputs crosswalk file. 
+  #' 
+  #' @param crosswalk_df Crosswalk data.frame to output
+  #' @param output_agg Specifies what aggregation level the output is. "plant" or "none". 
+  #' @param diffs_only Specifies whether to output differences between the EPA and EIA dataset, or all matches. 
+  
+  # Require libraries
+  require(openxlsx)
+  require(dplyr)
+  require(tidyr)
+  require(stringr)
+  
+  # create field description labels 
   field_description_labels <-
     c("sequence_number"             = "Row number assigned to each observation. Included for purposes of sorting to original order.",
       "epa_state"                   = "The state where the facility is located in EPA's data.",
@@ -52,125 +70,69 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
   field_desc_df <- data.frame("Column Name" = field_col_names, "Description" = field_col_desc)
   colnames(field_desc_df) <- c("Column Name", "Description")
   
-  # define which columns to groupby by aggregation level
-  agg_groupby_cols <-
-    c("epa_state",
-      "epa_facility_name",
-      "epa_plant_id")
-      # "epa_latitude",
-      # "epa_longitude",
-      # "eia_state",
-      # "eia_plant_name",
-      # "eia_plant_id",
-      # "eia_latitude",
-      # "eia_longitude")
+  # check if FRS and/or NEEDS are included, and add suffix to file name if so 
+  if(params$include_FRS) { 
+    frs_string <- "_frs"
+  } else { 
+    frs_string <- ""}
   
-  if (agg_level == "plant") {
-    agg_groupby_cols <-
-      agg_groupby_cols
-  } else if (agg_level == "generator") {
-    agg_groupby_cols <-
-      c(agg_groupby_cols,
-        "epa_generator_id",
-        "mod_epa_generator_id")
-  } else if (agg_level == "unit") {
-    agg_groupby_cols <-
-      c(agg_groupby_cols,
-        "epa_generator_id",
-        "epa_unit_id",
-        "mod_epa_generator_id",
-        "mod_epa_unit_id")
-  }
+  if(params$include_NEEDS) { 
+    needs_string <- "_needs"
+  } else { 
+    needs_string <- ""}
   
-  # define which columns to concatenate text by aggregation level
-  agg_concat_cols <-
-    c("epa_status",
-      "epa_status_date",
-      "epa_latitude",
-      "epa_longitude",
-      "epa_fuel_type",
-      "epa_retire_year",
-      "eia_state",
-      "eia_plant_name",
-      "eia_latitude",
-      "eia_longitude",
-      "eia_fuel_type",
-      "eia_retire_year",
-      "eia_plant_id",
-      "eia_generator_id",
-      "eia_boiler_id",
-      "eia_unit_type",
-      "plant_id_change_flag",
-      "mod_eia_plant_id",
-      "mod_eia_boiler_id", 
-      "mod_eia_generator_id_boiler",
-      "mod_eia_generator_id_gen",
-      "match_type_gen",
-      "match_type_boiler")
+  # clean year columns
+  clean_cols <- c(
+    "epa_retire_year",
+    "eia_retire_year")
   
-  if (agg_level == "plant") {
-    agg_concat_cols <-
-      c(agg_concat_cols,
-        "epa_generator_id",
-        "epa_unit_id",
-        "mod_epa_generator_id",
-        "mod_epa_unit_id")
-  } else if (agg_level == "generator") {
-    agg_concat_cols <-
-      c(agg_concat_cols,
-        "epa_unit_id",
-        "mod_epa_unit_id")
-  } else if (agg_level == "unit") {
-    agg_concat_cols <-
-      agg_concat_cols
-  }
+  crosswalk_df <- 
+    crosswalk_df %>%
+    mutate(across(all_of(clean_cols),
+                  ~na_if(.x, 0)))
   
-  # define which columns to sum
-  agg_sum_cols <-
-    c("epa_nameplate_capacity",
-      "eia_nameplate_capacity")
-  
-  if (agg_level != "plant") {
-    epa_eia_crosswalk <- epa_eia_crosswalk %>%
-      group_by(pick(all_of(agg_groupby_cols))) %>%
-      summarize(across(all_of(agg_concat_cols), ~paste(unique(.x), collapse = ", ")),
-                across(all_of(agg_sum_cols), ~sum(.x, na.rm = TRUE))) %>%
-      ungroup() %>%
-      mutate(sequence_number = row_number()) %>%
-      select(field_col_names)
-  }
-
-  
-  if (agg_level == "plant") {
-    epa_eia_crosswalk <- epa_eia_crosswalk %>%
-                         select(epa_plant_id,
-                                epa_facility_name, 
-                                eia_plant_id,
-                                eia_plant_name,
-                                plant_id_change_flag) %>%
-                         distinct()
-  }
-  
-  if (diffs_only) {
-    if (agg_level != "plant") {
-      epa_eia_crosswalk <- epa_eia_crosswalk %>%
-        filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
+  # aggregate to plant if specified 
+  if(output_agg == "plant") {
+    
+    crosswalk_df <- 
+      crosswalk_df %>%
+      select(epa_plant_id,
+             epa_facility_name, 
+             eia_plant_id,
+             eia_plant_name) %>%
+      distinct() %>% 
+      drop_na()
+    
+    if(diffs_only) {
+      crosswalk_df <- 
+        crosswalk_df %>%
+        filter(plant_id_change_flag == 1) %>%
+        select(-plant_id_change_flag)
+      
+      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
+      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.csv")
+      
     } else {
-      epa_eia_crosswalk <- epa_eia_crosswalk %>%
-                           filter(plant_id_change_flag != "0") %>%
-                           select(-plant_id_change_flag)
+      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
+      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant{frs_string}{needs_string}_{params$crosswalk_year}.csv")
     }
-
-    file_name <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}_unmatched.xlsx")
-    file_name_csv <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}_unmatched.csv")
-  } else {
-    file_name <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.xlsx")
-    file_name_csv <- glue::glue("data/outputs/epa_eia_crosswalk_{agg_level}.csv")
+  } else { 
+    if(diffs_only) { 
+      crosswalk_df <- 
+        crosswalk_df %>%
+        filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
+      
+      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
+      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.csv")
+    } else { 
+      file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
+      file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk{frs_string}{needs_string}_{params$crosswalk_year}.csv")
+    }
   }
   
   # Create/modify xlsx workbook and worksheet to add text format to cells, preventing Excel from
   # changing some GENIDs and UNIT_IDs to dates and other automatic formatting issues
-  if (!file.exists(file_name)) {
+  if(!file.exists(file_name)) {
     wb <- createWorkbook()
   } else {
     wb <- loadWorkbook(file_name)
@@ -178,45 +140,45 @@ output_crosswalk <- function(epa_eia_crosswalk, agg_level, diffs_only = FALSE) {
     removeWorksheet(wb, "field_descriptions")
     removeWorksheet(wb, "epa_eia_crosswalk")
   }
-
+  
   addWorksheet(wb, "field_descriptions")
   addWorksheet(wb, "epa_eia_crosswalk")
-
+  
   # The numFmt = TEXT specifies text format for the cells,
   # thus avoiding the automatic conversion to dates
   # (e.g. 6-1 and 1-1 wont be converted to Jun-1, Jan-1) when "GENERAL" format is used
   textstyle <- createStyle(fontName = "Calibri", fontSize = 11, numFmt = "TEXT")
-
+  
   writeDataTable(wb = wb, sheet = "field_descriptions", x = field_desc_df)
-
+  
   addStyle(
     wb = wb, sheet = "field_descriptions",
     rows = 1:nrow(field_desc_df), cols = 1:ncol(field_desc_df),
     style = textstyle, gridExpand = TRUE
   )
-
-  writeDataTable(wb = wb, sheet = "epa_eia_crosswalk", x = epa_eia_crosswalk)
-
+  
+  writeDataTable(wb = wb, sheet = "epa_eia_crosswalk", x = crosswalk_df)
+  
   addStyle(
     wb = wb, sheet = "epa_eia_crosswalk",
-    rows = 1:nrow(epa_eia_crosswalk), cols = 1:ncol(epa_eia_crosswalk),
+    rows = 1:nrow(crosswalk_df), cols = 1:ncol(crosswalk_df),
     style = textstyle, gridExpand = TRUE
   )
-
+  
   setColWidths(wb, sheet = "field_descriptions", cols = 1, widths = 27.29)
   setColWidths(wb, sheet = "field_descriptions", cols = 2, widths = 236.14)
-
+  
   saveWorkbook(wb, file_name, overwrite = TRUE)
-
+  
   print(glue::glue("{file_name} saved successfully."))
-
+  
   # For a more accessible document, output csv, but if used in Excel, some GENIDs will be
   # interpreted as dates and leading zeros will be removed causing issues.
-  write_excel_csv(epa_eia_crosswalk,
+  write_excel_csv(crosswalk_df,
                   file_name_csv,
                   col_names = TRUE,
                   na = ""
   )
-
+  
   print(glue::glue("{file_name_csv} saved successfully."))
 }

@@ -1,30 +1,73 @@
 ## -------------------------------
 ##
-## Output crosswalk
+## Output crosswalk functions
 ## 
 ## Purpose: 
 ## 
-## This file produces crosswalk export depending on inputs
-## 
+## This file contains all matching functions required for exporting and saving
+## crosswalk file data
 ##
 ## -------------------------------
 
+# Load libraries and functions -----------------
+library(openxlsx)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+
+# Load necessary functions
+source("scripts/functions/function_check_params.R")
 source("scripts/functions/function_output_crosswalk.R")
 
-# clean data
-clean_cols <- c(
-  "epa_retire_year",
-  "eia_retire_year")
+# Set up year parameters
+if (!exists("params")) {
+  params <- check_params()
+  
+  # check for params$diffs_only and params$agg_level
+  if(!("diffs_only" %in% names(params))) {  # if params() is defined, but diffs_only is not, define it here 
+    params$diffs_only <- readline(prompt = "Input diffs_only: ") } 
+  
+  if(!("output_agg" %in% names(params))) {  # if params() is defined, but agg_level is not, define it here 
+    params$output_agg <- readline(prompt = "Input output_agg (plant or none): ")
+    params$output_agg <- as.character(params$output_agg) 
+  }
+  
+} else {
+  print("Crosswalk parameters are already defined.")
+}
 
-epa_eia_crosswalk_4 <- epa_eia_crosswalk_3 %>%
-                       mutate(across(all_of(clean_cols),
-                                     ~na_if(.x, 0)))
-
-# plant ver - select epa_plant_id epa_plant_name, eia_plant_id eia_plant_name
 
 
-output_crosswalk(epa_eia_crosswalk_4, agg_level = params$output_agg, diffs_only = params$diffs_only)
+# Load data ----------------------------
 
+epa_eia_crosswalk <- 
+  read_rds(glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_match.RDS"))$epa_eia_crosswalk
 
+if(params$include_FRS) { 
+  epa_frs <- 
+    read_rds(glue::glue("data/outputs/{params$crosswalk_year}/epa_frs_match.RDS"))
+}
 
+if(params$include_NEEDS) { 
+  eia_needs <- 
+    read_rds(glue::glue("data/outputs/{params$crosswalk_year}/eia_needs_match.RDS"))
+}
 
+# Merge datasets where applicable -----------------------
+
+if(params$include_FRS) { 
+  epa_eia_crosswalk <- 
+    epa_eia_crosswalk %>% 
+    full_join(epa_frs) %>% 
+    relocate(frs_id, .before = match_type_gen)}
+
+if(params$include_NEEDS) { 
+  epa_eia_crosswalk <- 
+    epa_eia_crosswalk %>% 
+    full_join(eia_needs) %>% 
+    relocate(frs_id, .before = match_type_gen)}
+
+# Format and output crosswalk ---------------------
+
+output_crosswalk(epa_eia_crosswalk, params$output_agg, params$diffs_only)
