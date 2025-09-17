@@ -9,12 +9,70 @@
 ##
 ## -------------------------------
 
-# Load in libraries
+# Load libraries
 library(stringdist)
 library(fuzzyjoin)
 library(stringr)
 library(openxlsx)
+library(readr)
+library(dplyr)
 
+# Load necessary functions
+source("scripts/functions/function_check_params.R")
+
+# Set up year parameters
+if (!exists("params")) {
+  params <- check_params()
+} else {
+  print("Crosswalk parameters are already defined.")
+}
+
+# Load in modified and cleaned data
+epa_eia_crosswalk <- 
+  read_rds(glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_match.RDS"))$epa_eia_crosswalk
+
+epa_eia_to_match <-
+  epa_eia_crosswalk %>%
+  # filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match"))) %>%
+  filter(match_type == "Manual EPA Excluded") %>%
+  select(epa_plant_id,
+         epa_facility_name,
+         epa_unit_id, 
+         epa_generator_id,
+         epa_nameplate_capacity,
+         max_hourly_hi_rate_mmbtu_hr,
+         mod_epa_unit_id,
+         mod_epa_generator_id,
+         epa_latitude,
+         epa_longitude)
+
+
+eia_nameplate_matching <- 
+  eia_generator_modified %>%
+  select(eia_plant_id,
+         eia_plant_name,
+         eia_generator_id,
+         eia_nameplate_capacity,
+         mod_eia_generator_id,
+         mod_eia_plant_id,
+         eia_latitude,
+         eia_longitude)
+
+
+epa_eia_to_match_2 <-
+  epa_eia_to_match %>%
+  filter(!is.na(epa_nameplate_capacity)) %>%
+  fuzzy_join(
+    eia_nameplate_matching,
+    by = c("epa_nameplate_capacity" = "eia_nameplate_capacity"),
+    match_fun = function(x,y) {
+    abs(x - y) / pmin(abs(x), abs(y)) <= 0.05}
+  ) %>%
+  mutate(plant_id_dist = stringdist(epa_plant_id, eia_plant_id, method = "lv")) %>%
+  slice_min(plant_id_dist, n = 2)
+  
+# add heat input into crosswalk
+eia_heat <- eia$heat
 
 # fuel type map
 # "Pipeline Natural Gas" = "NG"

@@ -407,7 +407,6 @@ epa_unmatched_2 <-
   )
 
 # Bind the unmatched EPA units to the result  
-# flag: change this to be editable in params to include or not include outputs
 epa_eia_crosswalk_3 <- 
   epa_eia_crosswalk_2 %>%
   bind_rows(epa_unmatched_2 %>% select(any_of(final_crosswalk_cols))) %>%
