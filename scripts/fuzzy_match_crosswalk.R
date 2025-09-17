@@ -17,6 +17,9 @@ library(openxlsx)
 library(readr)
 library(dplyr)
 
+# flag to include potential matches 
+# number of true/false flags (to include)
+
 # Load necessary functions
 source("scripts/functions/function_check_params.R")
 
@@ -28,51 +31,85 @@ if (!exists("params")) {
 }
 
 # Load in modified and cleaned data
-epa_eia_crosswalk <- 
+matched_crosswalk <- 
   read_rds(glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_match.RDS"))$epa_eia_crosswalk
 
-epa_eia_to_match <-
-  epa_eia_crosswalk %>%
-  # filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match"))) %>%
-  filter(match_type == "Manual EPA Excluded") %>%
+# select out unmatched EPA units
+epa_to_match <-
+  matched_crosswalk %>%
+  filter(str_detect(match_type_gen, "EPA Unmatched") | str_detect(match_type_boiler, "EPA Unmatched")) %>%
   select(epa_plant_id,
          epa_facility_name,
          epa_unit_id, 
          epa_generator_id,
          epa_nameplate_capacity,
-         max_hourly_hi_rate_mmbtu_hr,
+         epa_heat_input_mmbtu,
          mod_epa_unit_id,
          mod_epa_generator_id,
          epa_latitude,
          epa_longitude)
 
-
-eia_nameplate_matching <- 
-  eia_generator_modified %>%
+# prep EIA data 
+eia_to_match <- 
+  # eia_generator_modified %>%
+  eia_boiler_modified %>%
   select(eia_plant_id,
-         eia_plant_name,
+         # eia_plant_name,
          eia_generator_id,
-         eia_nameplate_capacity,
-         mod_eia_generator_id,
+         eia_boiler_id,
+         # eia_nameplate_capacity,
          mod_eia_plant_id,
+         mod_eia_generator_id,
+         mod_eia_boiler_id,
          eia_latitude,
-         eia_longitude)
+         eia_longitude) %>%
+  # join EIA generator data (has nameplate capacity)
+  full_join(eia_generator_modified,
+            by = c("eia_plant_id",
+                   "eia_generator_id",
+                   "mod_eia_plant_id", 
+                   "mod_eia_generator_id")) %>%
+  mutate(eia_latitude = coalesce(eia_latitude.x, eia_latitude.y),
+         eia_longitude = coalesce(eia_longitude.x, eia_longitude.y)) %>%
+  select(-c(eia_latitude.x, eia_latitude.y, 
+            eia_longitude.x, eia_longitude.y)) %>%
+  # join EIA heat input data
+  full_join(eia$heat %>% select(-c(eia_plant_name, eia_plant_state)), 
+            by = c("eia_plant_id",
+                   "eia_boiler_id",
+                   "eia_fuel_type",
+                   "eia_unit_type" = "eia_prime_mover"))
 
 
-epa_eia_to_match_2 <-
-  epa_eia_to_match %>%
-  filter(!is.na(epa_nameplate_capacity)) %>%
-  fuzzy_join(
-    eia_nameplate_matching,
-    by = c("epa_nameplate_capacity" = "eia_nameplate_capacity"),
-    match_fun = function(x,y) {
-    abs(x - y) / pmin(abs(x), abs(y)) <= 0.05}
-  ) %>%
-  mutate(plant_id_dist = stringdist(epa_plant_id, eia_plant_id, method = "lv")) %>%
-  slice_min(plant_id_dist, n = 2)
-  
-# add heat input into crosswalk
-eia_heat <- eia$heat
+# match_step1: Direct match between plant ID, generation ID, and unit/boiler ID
+match_step1 <- left_join(epa_to_match, 
+                         eia_to_match, 
+                         by = c("epa_plant_id" = "eia_plant_id")) %>%
+                                # "mod_epa_generator_id" = "mod_eia_generator_id",
+                                # "mod_epa_unit_id" = "mod_eia_boiler_id")) %>%
+               mutate(match_step1 = ifelse(is.na(mod_eia_plant_id), FALSE, TRUE))
+
+# match_step2: Matching for nameplate capacity (range: +/-5%)
+match_step2 <- match_step1 %>%
+               mutate(nameplate_capacity_pct_diff = abs(epa_nameplate_capacity - eia_nameplate_capacity) / 
+                                                    pmin(abs(epa_nameplate_capacity), abs(eia_nameplate_capacity)),
+                      match_step2 = ifelse(nameplate_capacity_pct_diff > 0.05 | is.na(nameplate_capacity_pct_diff), FALSE, TRUE))
+
+
+# match_step3: Matching for heat_input (range: +/-200%)
+match_step3 <- match_step2 %>%
+               mutate(heat_input_pct_diff = abs(epa_heat_input_mmbtu - eia_heat_input_mmbtu) / 
+                                            pmin(abs(epa_heat_input_mmbtu), abs(eia_heat_input_mmbtu)),
+                      match_step3 = ifelse(heat_input_pct_diff > 2 | is.na(heat_input_pct_diff), FALSE, TRUE))
+
+# flag make editable
+min_matches <- 1
+
+# number of trues 
+end_matches <- match_step3 %>%
+               mutate(match_count = rowSums(across(c("match_step1", "match_step2", "match_step3")) == TRUE)) %>%
+               filter(match_count >= min_matches)
+
 
 # fuel type map
 # "Pipeline Natural Gas" = "NG"

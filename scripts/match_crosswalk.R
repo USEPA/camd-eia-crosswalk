@@ -339,6 +339,7 @@ final_crosswalk_cols <-
     "epa_unit_id",
     "epa_generator_id",
     "epa_nameplate_capacity",
+    "epa_heat_input_mmbtu",
     "epa_fuel_type",
     "epa_latitude",
     "epa_longitude",
