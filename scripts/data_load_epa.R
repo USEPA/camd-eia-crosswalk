@@ -177,4 +177,4 @@ rm(response)
 epa_file_path <- "data/raw_data/epa"
 epa_file_name <- "epa_raw.RDS"
 
-save_data(facility_df, epa_file_path, epa_file_name)
+save_data(epa_data_combined, epa_file_path, epa_file_name)

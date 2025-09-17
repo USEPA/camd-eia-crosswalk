@@ -17,6 +17,9 @@ library(openxlsx)
 library(readr)
 library(dplyr)
 
+# flag to include potential matches 
+# number of true/false flags (to include)
+
 # Load necessary functions
 source("scripts/functions/function_check_params.R")
 
@@ -28,37 +31,64 @@ if (!exists("params")) {
 }
 
 # Load in modified and cleaned data
-epa_eia_crosswalk <- 
+matched_crosswalk <- 
   read_rds(glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_match.RDS"))$epa_eia_crosswalk
 
-epa_eia_to_match <-
-  epa_eia_crosswalk %>%
-  # filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match"))) %>%
-  filter(match_type == "Manual EPA Excluded") %>%
+# select out unmatched 
+epa_to_match <-
+  matched_crosswalk %>%
+  filter(str_detect(match_type_gen, "EPA Unmatched") | str_detect(match_type_boiler, "EPA Unmatched")) %>%
   select(epa_plant_id,
          epa_facility_name,
          epa_unit_id, 
          epa_generator_id,
          epa_nameplate_capacity,
-         max_hourly_hi_rate_mmbtu_hr,
+         epa_heat_input_mmbtu,
          mod_epa_unit_id,
          mod_epa_generator_id,
          epa_latitude,
          epa_longitude)
 
-
-eia_nameplate_matching <- 
-  eia_generator_modified %>%
+# prep EIA data 
+eia_to_match <- 
+  # eia_generator_modified %>%
+  eia_boiler_modified %>%
   select(eia_plant_id,
-         eia_plant_name,
+         # eia_plant_name,
          eia_generator_id,
-         eia_nameplate_capacity,
-         mod_eia_generator_id,
+         eia_boiler_id,
+         # eia_nameplate_capacity,
          mod_eia_plant_id,
+         mod_eia_generator_id,
+         mod_eia_boiler_id,
          eia_latitude,
          eia_longitude)
 
+# add heat input into crosswalk
+# sheet eia860 - matching boiler and generator
+# first merge to eia boiler data
+eia_heat_matching <- 
+  eia$heat %>%
+  left_join(eia_boiler_modified,
+            by = c("eia_plant_id", 
+                   "eia_boiler_id")) %>%
+  left_join(eia_generator_modified, #),
+            by = c("eia_plant_id",
+                   "eia_generator_id",
+                   "eia_prime_mover" = "eia_unit_type",
+                   "eia_fuel_type"))
 
+# match_step1: Direct match between plant ID, generation ID, and unit/boiler ID
+match_step1 <- left_join(epa_to_match, 
+                         eia_to_match, 
+                         by = c("epa_plant_id" = "eia_plant_id")) %>%
+                                # "mod_epa_generator_id" = "mod_eia_generator_id",
+                                # "mod_epa_unit_id" = "mod_eia_boiler_id")) %>%
+               mutate(match_step1 = ifelse(is.na(mod_eia_plant_id), FALSE, TRUE))
+
+# match_step2: 
+
+# matching for nameplate capacity
 epa_eia_to_match_2 <-
   epa_eia_to_match %>%
   filter(!is.na(epa_nameplate_capacity)) %>%
@@ -69,10 +99,12 @@ epa_eia_to_match_2 <-
     abs(x - y) / pmin(abs(x), abs(y)) <= 0.05}
   ) %>%
   mutate(plant_id_dist = stringdist(epa_plant_id, eia_plant_id, method = "lv")) %>%
-  slice_min(plant_id_dist, n = 2)
+  slice_min(plant_id_dist, n = 2) %>%
+  mutate(match_type = "Nameplate Capacity Fuzzy Match")
   
-# add heat input into crosswalk
-eia_heat <- eia$heat
+
+
+
 
 # fuel type map
 # "Pipeline Natural Gas" = "NG"
