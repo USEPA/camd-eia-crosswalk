@@ -341,6 +341,7 @@ final_crosswalk_cols <-
     "epa_nameplate_capacity",
     "epa_heat_input_mmbtu",
     "epa_fuel_type",
+    "epa_prime_mover",
     "epa_latitude",
     "epa_longitude",
     "epa_status",
@@ -424,3 +425,5 @@ match_crosswalk <- list("epa_eia_crosswalk" = epa_eia_crosswalk_3,
 # Export data -----------------------------
 
 save_data(match_crosswalk, "data/outputs", "epa_eia_match.RDS")
+save_data(eia_boiler_modified, "data/outputs", "eia_boiler_modified.RDS")
+save_data(eia_generator_modified, "data/outputs", "eia_generator_modified.RDS")
