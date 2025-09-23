@@ -55,27 +55,26 @@ epa_to_match <-
          mod_epa_generator_id,
          epa_latitude,
          epa_longitude) %>%
-  filter(!is.na(epa_generator_id))
+  filter(!is.na(epa_generator_id)) # exclude units where generator_id is NA
 
-# exclude units where generator_id is NA
+matched_crosswalk_2 <-
+  matched_crosswalk %>%
+  filter(!str_detect(match_type_gen, "EPA Unmatched") | !str_detect(match_type_boiler, "EPA Unmatched")) %>%
+  select(contains("eia"))
 
 # prep EIA data 
-# flag: add in eia_generator_modified and eia_boiler_modified
 eia_to_match <- 
-  # eia_generator_modified %>%
-  eia_boiler_modified %>% # 7,451 entries
+  eia_boiler_modified %>% # EIA boiler data
   select(eia_plant_id,
-         # eia_plant_name,
          eia_generator_id,
          eia_boiler_id,
-         # eia_nameplate_capacity,
          mod_eia_plant_id,
          mod_eia_generator_id,
          mod_eia_boiler_id,
          eia_latitude,
          eia_longitude) %>%
   # join EIA generator data (has nameplate capacity)
-  full_join(eia_generator_modified, # 19,072 entrie
+  full_join(eia_generator_modified, 
             by = c("eia_plant_id",
                    "eia_generator_id",
                    "mod_eia_plant_id", 
@@ -85,58 +84,58 @@ eia_to_match <-
   select(-c(eia_latitude.x, eia_latitude.y, 
             eia_longitude.x, eia_longitude.y)) %>%
   # join EIA heat input data
-  full_join(eia$heat %>% select(-c(eia_plant_name, eia_plant_state)), # 25,407 entries
+  full_join(eia$heat %>% select(-c(eia_plant_name, eia_plant_state)),
             by = c("eia_plant_id",
                    "eia_boiler_id",
-                   "eia_fuel_type"))
-                   # "eia_unit_type" = "eia_prime_mover"))
+                   "eia_fuel_type")) %>%
+  # anti-join of matches that are already in the match crosswalk
+  anti_join(matched_crosswalk)
 
 # epa_eia_matched_plant_id: Direct match on plant ID 
 epa_eia_matched_plant_id <- left_join(epa_to_match, 
                             eia_to_match, 
-                            by = c("epa_plant_id" = "eia_plant_id")) %>% # rename to just plant_id
-                                # "mod_epa_generator_id" = "mod_eia_generator_id",
-                                # "mod_epa_unit_id" = "mod_eia_boiler_id")) %>%
-                            rename(plant_id = epa_plant_id)
-               # mutate(match_step1 = ifelse(is.na(mod_eia_plant_id), FALSE, TRUE))
+                            by = c("epa_plant_id" = "mod_eia_plant_id")) %>% 
+                            rename(plant_id = epa_plant_id) # rename to just plant_id
 
 # match_step1: Matching for nameplate capacity (range: +/-5%)
 match_step1 <- epa_eia_matched_plant_id %>%
-               mutate(nameplate_capacity_pct_diff = abs(epa_nameplate_capacity - eia_nameplate_capacity) / 
+               mutate(nameplate_capacity_pct_diff = abs(epa_nameplate_capacity - eia_nameplate_capacity) / # calculate percent difference for nameplate capacity
                                                     pmin(abs(epa_nameplate_capacity), abs(eia_nameplate_capacity)),
-                      match_step1 = ifelse(nameplate_capacity_pct_diff > 0.05 | is.na(nameplate_capacity_pct_diff), FALSE, TRUE))
+                      nameplate_capacity_match = ifelse(nameplate_capacity_pct_diff > 0.05 | is.na(nameplate_capacity_pct_diff), FALSE, TRUE))
 
 
 # match_step2: Matching for heat_input (range: +/-200%)
 match_step2 <- match_step1 %>%
-               mutate(heat_input_pct_diff = abs(epa_heat_input_mmbtu - eia_heat_input_mmbtu) / 
+               mutate(heat_input_pct_diff = abs(epa_heat_input_mmbtu - eia_heat_input_mmbtu) / # calculate percent difference for heat_input
                                             pmin(abs(epa_heat_input_mmbtu), abs(eia_heat_input_mmbtu)),
-                      match_step2 = ifelse(heat_input_pct_diff > 2 | is.na(heat_input_pct_diff), FALSE, TRUE))
+                      heat_input_match = ifelse(heat_input_pct_diff > 2 | is.na(heat_input_pct_diff), FALSE, TRUE))
 
-# prime mover match step
+# match_step3: Matching for prime_mover
 match_step3 <- match_step2 %>%
-               mutate(match_step3 = ifelse(epa_prime_mover == eia_prime_mover | epa_prime_mover == eia_unit_type, TRUE, FALSe))
+               mutate(prime_mover_match = ifelse(epa_prime_mover == eia_prime_mover | epa_prime_mover == eia_unit_type, TRUE, FALSE))
 
-
-
-# duplicates in end matches - check if are duplicates in EIA
 
 # flag: make editable
 min_matches <- 1
 
 # number of trues 
-end_matches <- match_step2 %>%
-               mutate(match_count = rowSums(across(c("match_step1", "match_step2", "match_step3")) == TRUE)) %>%
-               filter(match_count >= min_matches)
+end_matches <- match_step3 %>%
+               mutate(match_count = rowSums(across(c("nameplate_capacity_match", "heat_input_match", "prime_mover_match")) == TRUE)) %>%
+               filter(match_count >= min_matches) %>% 
+               relocate(mod_epa_generator_id, 
+                        mod_eia_generator_id, 
+                        mod_epa_unit_id, 
+                        mod_eia_boiler_id, .after = last_col())
+
 
 
 # fuel type map
 # "Pipeline Natural Gas" = "NG"
 # "Coal" = "BIT"
 # fuel types are different between the two types, making it difficult to match up
-view_fuel_types <- epa_eia_crosswalk_3 %>%
-                   select(epa_fuel_type, eia_fuel_type) %>%
-                   distinct()
+# view_fuel_types <- epa_eia_crosswalk_3 %>%
+#                    select(epa_fuel_type, eia_fuel_type) %>%
+#                    distinct()
 
 # create matching strings
 # these can be edited in order to adjust for different inputs/dataframes

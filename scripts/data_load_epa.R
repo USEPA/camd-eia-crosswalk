@@ -131,6 +131,23 @@ facility_df <-
          epa_status_date = commercial_operation_date) %>%
   arrange(epa_generator_id, epa_unit_id)
 
+pm_st <- c("BFB", "C", "CB", "CFB", "DB", "DTF", "DVF", "IGC", "KLN", "OB", "PRH", "S", "T", "WBF", "WBT")
+pm_gt <- c("AF", "CT")
+pm_ct <- c("CC")
+pm_ot <- c("OT")
+
+facility_df_2 <- 
+  facility_df %>% 
+  mutate(
+    # creating prime_mover based on mapping above
+    epa_prime_mover = case_when( 
+      epa_prime_mover %in% pm_st ~ "ST",
+      epa_prime_mover %in% pm_gt ~ "GT",
+      epa_prime_mover %in% pm_ct ~ "CT",
+      epa_prime_mover %in% pm_ot ~ "OT",
+      TRUE ~ "EIA PM"))
+    
+
 ## Get emissions data -----
 
 emissions_files <-
@@ -163,7 +180,7 @@ emissions_data_clean <-
 
 ## Combine EPA data together -----
 epa_data_combined <- 
-  facility_df %>% 
+  facility_df_2 %>% 
   left_join(emissions_data_clean,
             by = c("epa_plant_id", "epa_unit_id", "epa_fuel_type")) %>% 
   coalesce_join_vars() %>% 
