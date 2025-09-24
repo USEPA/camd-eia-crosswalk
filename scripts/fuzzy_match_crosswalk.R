@@ -3,9 +3,11 @@
 ## Fuzzy match crosswalk
 ## 
 ## Purpose: 
+## Match unmatched EPA units to EIA data using additional matching steps.
+## These matches are potential matches that need to be reviewed.
 ## 
-## 
-## 
+## Authors:
+##    Madeline Zhang, Abt Global
 ##
 ## -------------------------------
 
@@ -16,9 +18,6 @@ library(stringr)
 library(openxlsx)
 library(readr)
 library(dplyr)
-
-# flag to include potential matches 
-# number of true/false flags (to include)
 
 # Load necessary functions
 source("scripts/functions/function_check_params.R")
@@ -40,6 +39,10 @@ eia_generator_modified <-
 eia_boiler_modified <-
   read_rds(glue::glue("data/outputs/{params$crosswalk_year}/eia_boiler_modified.RDS"))
 
+eia_heat <- 
+  read_rds(glue::glue("data/raw_data/eia/{params$crosswalk_year}/eia_raw.RDS"))$heat
+
+### Algorithmic Matching ----
 # select out unmatched EPA units
 epa_to_match <-
   matched_crosswalk %>%
@@ -57,6 +60,7 @@ epa_to_match <-
          epa_longitude) %>%
   filter(!is.na(epa_generator_id)) # exclude units where generator_id is NA
 
+# EIA data that was matched in "match_crosswalk.R"
 matched_crosswalk_2 <-
   matched_crosswalk %>%
   filter(!str_detect(match_type_gen, "EPA Unmatched") | !str_detect(match_type_boiler, "EPA Unmatched")) %>%
@@ -84,12 +88,12 @@ eia_to_match <-
   select(-c(eia_latitude.x, eia_latitude.y, 
             eia_longitude.x, eia_longitude.y)) %>%
   # join EIA heat input data
-  full_join(eia$heat %>% select(-c(eia_plant_name, eia_plant_state)),
+  full_join(eia_heat %>% select(-c(eia_plant_name, eia_plant_state)),
             by = c("eia_plant_id",
                    "eia_boiler_id",
                    "eia_fuel_type")) %>%
   # anti-join of matches that are already in the match crosswalk
-  anti_join(matched_crosswalk)
+  anti_join(matched_crosswalk_2)
 
 # epa_eia_matched_plant_id: Direct match on plant ID 
 epa_eia_matched_plant_id <- left_join(epa_to_match, 
@@ -115,28 +119,28 @@ match_step3 <- match_step2 %>%
                mutate(prime_mover_match = ifelse(epa_prime_mover == eia_prime_mover | epa_prime_mover == eia_unit_type, TRUE, FALSE))
 
 
-# flag: make editable
-min_matches <- 1
-
-# number of trues 
+# end_matches: Resulting matches where at least one match step is TRUE
 end_matches <- match_step3 %>%
                mutate(match_count = rowSums(across(c("nameplate_capacity_match", "heat_input_match", "prime_mover_match")) == TRUE)) %>%
-               filter(match_count >= min_matches) %>% 
+               filter(match_count > 0) %>% 
                relocate(mod_epa_generator_id, 
                         mod_eia_generator_id, 
                         mod_epa_unit_id, 
                         mod_eia_boiler_id, .after = last_col())
 
+# Save output data
+# library(openxlsx)
+# write.xlsx(end_matches, 'crosswalk_potential_matches_to_review.xlsx')
 
 
-# fuel type map
-# "Pipeline Natural Gas" = "NG"
-# "Coal" = "BIT"
-# fuel types are different between the two types, making it difficult to match up
-# view_fuel_types <- epa_eia_crosswalk_3 %>%
-#                    select(epa_fuel_type, eia_fuel_type) %>%
-#                    distinct()
+# wb <- createWorkbook()
+# addWorksheet(wb, "without_prev_match")
+# writeData(wb, sheet = "without_prev_match", x = end_matches)
+# addWorksheet(wb, "with_prev_match")
+# writeData(wb, sheet = "with_prev_match", x = end_matches)
+# saveWorkbook(wb, "crosswalk_potential_matches_to_review.xlsx")
 
+### Fuzzy Matching Using ID Strings ----
 # create matching strings
 # these can be edited in order to adjust for different inputs/dataframes
 # currently set to EPA-EIA Boiler Crosswalk
