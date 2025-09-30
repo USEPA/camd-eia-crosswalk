@@ -37,7 +37,10 @@ check_params <- function() {
       params$include_FRS <- readline(prompt = "Input include_FRS (TRUE/FALSE): ")
     } else if(!("include_NEEDS" %in% names(params))) {  # if params() is defined, but include_NEEDS is not, define it here 
       params$include_NEEDS <- readline(prompt = "Input include_NEEDS (TRUE/FALSE): ")
-    }
+    } 
+    # else if(!("include_potential_matches" %in% names(params))) {  # if params() is defined, but include_NEEDS is not, define it here 
+    #   params$include_potential_matches <- readline(prompt = "Input include_potential_matches (TRUE/FALSE): ")
+    # }
   } else { 
     params <- list()
     params$crosswalk_year <- readline(prompt = "Input crosswalk_year: ")
@@ -46,6 +49,7 @@ check_params <- function() {
     params$earliest_retirement_year <- as.character(params$earliest_retirement_year)
     params$include_FRS <- readline(prompt = "Input include_FRS (TRUE/FALSE): ")
     params$include_NEEDS <- readline(prompt = "Input include_NEEDS (TRUE/FALSE): ")
+    #params$include_potential_matches <- readline(prompt = "Input include_potential_matches (TRUE/FALSE): ")
   }
   
   # valid eGRID years (update this every crosswalk year to include latest year)
@@ -70,6 +74,11 @@ check_params <- function() {
     print("The input for params$include_NEEDS is not one of the valid responses. Please input TRUE or FALSE.")
     return(check_params()) # restart function for new inputs
   }
+  
+  # if(!(params$include_potential_matches %in% c(TRUE, FALSE))) {
+  #   print("The input for params$include_potential_matches is not one of the valid responses. Please input TRUE or FALSE.")
+  #   return(check_params()) # restart function for new inputs
+  # }
 
   return(params)
 }
