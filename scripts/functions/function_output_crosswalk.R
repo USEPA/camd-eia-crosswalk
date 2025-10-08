@@ -94,25 +94,32 @@ output_crosswalk <- function(crosswalk_df, output_agg, diffs_only = FALSE) {
   # aggregate to plant if specified 
   if(output_agg == "plant") {
     
-    crosswalk_df <- 
-      crosswalk_df %>%
-      select(epa_plant_id,
-             epa_facility_name, 
-             eia_plant_id,
-             eia_plant_name) %>%
-      distinct() %>% 
-      drop_na()
     
     if(diffs_only) {
       crosswalk_df <- 
         crosswalk_df %>%
         filter(plant_id_change_flag == 1) %>%
-        select(-plant_id_change_flag)
+        select(epa_plant_id,
+             epa_facility_name, 
+             eia_plant_id,
+             eia_plant_name) %>%
+        distinct() %>% 
+        drop_na()
       
       file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
       file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.csv")
       
     } else {
+      crosswalk_df <- 
+        crosswalk_df %>%
+        select(epa_plant_id,
+               epa_facility_name, 
+               eia_plant_id,
+               eia_plant_name) %>%
+        distinct() %>% 
+        drop_na()
+      
+      
       file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
       file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_plant{frs_string}{needs_string}_{params$crosswalk_year}.csv")
     }
@@ -120,7 +127,7 @@ output_crosswalk <- function(crosswalk_df, output_agg, diffs_only = FALSE) {
     if(diffs_only) { 
       crosswalk_df <- 
         crosswalk_df %>%
-        filter((str_detect(match_type_gen, "EPA Unmatched") | str_detect(match_type_boiler, "EPA Unmatched")))
+        filter(!(str_detect(match_type_gen, "Manual EPA Excluded|EPA Unmatched") | str_detect(match_type_boiler, "Manual EPA Excluded|EPA Unmatched")))
       
       file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
       file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.csv")
