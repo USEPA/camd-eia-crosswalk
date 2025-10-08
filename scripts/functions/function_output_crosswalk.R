@@ -88,8 +88,8 @@ output_crosswalk <- function(crosswalk_df, output_agg, diffs_only = FALSE) {
   
   crosswalk_df <- 
     crosswalk_df %>%
-    mutate(across(all_of(clean_cols),
-                  ~na_if(.x, 0)))
+    mutate(across(all_of(clean_cols), ~na_if(.x, 0)),
+           plant_id_change_flag = ifelse(is.na(plant_id_change_flag), 0, plant_id_change_flag))
   
   # aggregate to plant if specified 
   if(output_agg == "plant") {
@@ -120,7 +120,7 @@ output_crosswalk <- function(crosswalk_df, output_agg, diffs_only = FALSE) {
     if(diffs_only) { 
       crosswalk_df <- 
         crosswalk_df %>%
-        filter(!(str_detect(match_type_gen, "Exact match|Manual Match") | str_detect(match_type_boiler, "Exact match|Manual Match")))
+        filter((str_detect(match_type_gen, "EPA Unmatched") | str_detect(match_type_boiler, "EPA Unmatched")))
       
       file_name <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.xlsx")
       file_name_csv <- glue::glue("data/outputs/{params$crosswalk_year}/epa_eia_crosswalk_diffs_only{frs_string}{needs_string}_{params$crosswalk_year}.csv")
